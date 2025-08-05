@@ -1,0 +1,68 @@
+version: "3.8"
+
+services:
+  rustbot:
+    # Option 1: Build locally from source
+    build: .
+
+    # Option 2: Use pre-built image from Docker Hub (uncomment after pushing)
+    # image: deekahy/rustbot:latest
+
+    container_name: rustbot
+    restart: unless-stopped
+
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - RUST_LOG=info
+
+    # Alternative: Use .env file for environment variables
+    env_file:
+      - .env
+
+    # Resource limits (optional but recommended for production)
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+        reservations:
+          memory: 256M
+          cpus: "0.25"
+
+    # Health check to monitor bot status
+    healthcheck:
+      test: ["CMD", "pgrep", "rustbot"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Networks
+    networks:
+      - rustbot-network
+
+# Optional: Watchtower for automatic updates (uncomment if needed)
+# watchtower:
+#   image: containrrr/watchtower
+#   container_name: rustbot-watchtower
+#   restart: unless-stopped
+#   volumes:
+#     - /var/run/docker.sock:/var/run/docker.sock
+#   command: --interval 3600 rustbot
+#   networks:
+#     - rustbot-network
+
+networks:
+  rustbot-network:
+    driver: bridge
+# Optional: Volumes for persistent data (uncomment if needed)
+# volumes:
+#   rustbot-data:
+#     driver: local

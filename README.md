@@ -75,6 +75,84 @@ https://discord.com/api/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=27
 cargo run
 ```
 
+## Docker Deployment 🐳
+
+RustBot can be easily deployed using Docker for consistent cross-platform deployment.
+
+### Prerequisites for Docker
+
+- Docker installed on your system
+- Docker Hub account (for pushing images)
+
+### Building and Running with Docker
+
+#### Option 1: Using the build script (Recommended)
+
+1. **Build and optionally push to Docker Hub:**
+```bash
+./docker-build.sh your_docker_username
+```
+
+2. **Run the container:**
+```bash
+# With environment variable
+docker run -e DISCORD_TOKEN=your_token_here your_docker_username/rustbot:latest
+
+# Or with .env file
+docker run --env-file .env your_docker_username/rustbot:latest
+```
+
+#### Option 2: Manual Docker commands
+
+1. **Build the image:**
+```bash
+docker build -t your_docker_username/rustbot:latest .
+```
+
+2. **Push to Docker Hub:**
+```bash
+docker login
+docker push your_docker_username/rustbot:latest
+```
+
+3. **Run the container:**
+```bash
+docker run -e DISCORD_TOKEN=your_token_here your_docker_username/rustbot:latest
+```
+
+#### Option 3: Using Docker Compose
+
+1. **Set your Discord token:**
+```bash
+export DISCORD_TOKEN=your_token_here
+```
+
+2. **Run with Docker Compose:**
+```bash
+docker-compose up -d
+```
+
+### Docker Features
+
+- **Native Compilation**: The Docker image compiles the Rust code natively on the target architecture
+- **Multi-stage Build**: Optimized build process with dependency caching
+- **Environment Variables**: Easy configuration through environment variables
+- **Auto-restart**: Container restarts automatically if the bot crashes (when using docker-compose)
+- **Minimal Image**: Based on official Rust image with only necessary dependencies
+
+### Docker Environment Variables
+
+- `DISCORD_TOKEN` - Your Discord bot token (required)
+- `RUST_LOG` - Log level (optional, defaults to `info`)
+
+### Pulling from Docker Hub
+
+Once pushed, others can run your bot directly:
+
+```bash
+docker run -e DISCORD_TOKEN=their_token_here your_docker_username/rustbot:latest
+```
+
 ## Adding New Commands
 
 To add new commands, follow these steps:
