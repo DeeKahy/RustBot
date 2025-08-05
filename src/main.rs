@@ -5,7 +5,7 @@ use serenity::{Client, GatewayIntents};
 
 mod commands;
 
-use commands::{hello, ping, spamping};
+use commands::{hello, ping, spamping, uwu};
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
@@ -47,7 +47,7 @@ async fn main() {
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![ping(), hello(), spamping()],
+            commands: vec![ping(), hello(), spamping(), uwu()],
             prefix_options: poise::PrefixFrameworkOptions {
                 prefix: Some("-".into()),
                 ..Default::default()

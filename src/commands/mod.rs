@@ -3,11 +3,13 @@ pub mod general;
 pub mod hello;
 pub mod ping;
 pub mod spamping;
+pub mod uwu;
 
 // Re-export all commands for easy access from main.rs
 pub use hello::hello;
 pub use ping::ping;
 pub use spamping::spamping;
+pub use uwu::uwu;
 
 // You can add more command modules here as needed
 // Example:
