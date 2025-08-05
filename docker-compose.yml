@@ -2,32 +2,30 @@ version: "3.8"
 
 services:
   rustbot:
-    # Option 1: Build locally from source
-    build: .
+    # Use pre-built multi-platform image (recommended)
+    image: deekahy/rustbot:latest
 
-    # Option 2: Use pre-built image from Docker Hub (uncomment after pushing)
-    # image: deekahy/rustbot:latest
+    # Uncomment to build locally instead
+    # build: .
 
     container_name: rustbot
     restart: unless-stopped
 
+    # Environment variables - these will be overridden by CasaOS
     environment:
-      - DISCORD_TOKEN=${DISCORD_TOKEN}
-      - RUST_LOG=info
+      - DISCORD_TOKEN=${DISCORD_TOKEN:-}
+      - RUST_LOG=${RUST_LOG:-info}
+      - RUST_BACKTRACE=${RUST_BACKTRACE:-1}
 
-    # Alternative: Use .env file for environment variables
-    env_file:
-      - .env
-
-    # Resource limits (optional but recommended for production)
+    # Resource limits (recommended for production)
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 256M
           cpus: "0.5"
         reservations:
-          memory: 256M
-          cpus: "0.25"
+          memory: 128M
+          cpus: "0.1"
 
     # Health check to monitor bot status
     healthcheck:
@@ -35,7 +33,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 15s
 
     # Logging configuration
     logging:
@@ -44,25 +42,15 @@ services:
         max-size: "10m"
         max-file: "3"
 
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+
     # Networks
     networks:
       - rustbot-network
 
-# Optional: Watchtower for automatic updates (uncomment if needed)
-# watchtower:
-#   image: containrrr/watchtower
-#   container_name: rustbot-watchtower
-#   restart: unless-stopped
-#   volumes:
-#     - /var/run/docker.sock:/var/run/docker.sock
-#   command: --interval 3600 rustbot
-#   networks:
-#     - rustbot-network
-
 networks:
   rustbot-network:
     driver: bridge
-# Optional: Volumes for persistent data (uncomment if needed)
-# volumes:
-#   rustbot-data:
-#     driver: local

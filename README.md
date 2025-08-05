@@ -7,18 +7,65 @@ A modern Discord bot built with Rust using the Serenity library and Poise comman
 - 🏓 **Ping Command**: Basic ping-pong functionality with latency measurement
 - 👋 **Hello Command**: Friendly greeting command with optional name parameter
 - 🚨 **Spam Ping**: Creates a thread and repeatedly pings a user until they respond
+- 🎯 **UwU Command**: Transform text into uwu speak
+- 🪙 **Coin Flip**: Random coin flip command
+- 👤 **Profile Picture**: Get user's profile picture
 - 🔧 **Modular Design**: Easy to add new commands and features
 - 📝 **Logging**: Built-in logging system for debugging and monitoring
 - ⚡ **Async**: Built with Tokio for high performance
 - 🎯 **Modern Framework**: Uses Poise for both prefix and slash commands
+- 🐳 **Docker Support**: Multi-platform Docker images for easy deployment
+- 🏠 **CasaOS Ready**: Optimized for CasaOS home server deployment
 
 ## Commands
 
-- `-ping` or `/ping` - Responds with "Pong!" and shows latency
-- `-hello [name]` or `/hello [name]` - Says hello to you or the specified name
-- `-spamping @user` or `/spamping @user` - Creates a thread and pings the user every 10 seconds until they respond
+- `-ping` - Responds with "Pong!" and shows latency
+- `-hello [name]` - Says hello to you or the specified name
+- `-spamping @user [count]` - Creates a thread and pings the user repeatedly
+- `-uwu <text>` - Transform text into uwu speak
+- `-coinflip` - Flip a coin (heads or tails)
+- `-pfp [user]` - Get user's profile picture
 
-## Setup
+## Quick Start with Docker (Recommended)
+
+### Option 1: CasaOS Deployment
+
+**Docker Image**: `deekahy/rustbot:latest`
+
+1. Add new application in CasaOS
+2. Use image: `deekahy/rustbot:latest`
+3. Set environment variable: `DISCORD_TOKEN=your_discord_bot_token`
+4. Set memory limit: `256m` and CPU limit: `0.5`
+5. Start the container
+
+**Platforms Supported**: Linux AMD64, Linux ARM64 (Raspberry Pi 4+)
+
+### Option 2: Docker Compose
+
+```bash
+# Quick start
+DISCORD_TOKEN=your_token docker-compose -f docker-compose.casaos.yml up -d
+
+# Or copy and edit the compose file
+cp docker-compose.casaos.yml docker-compose.yml
+# Edit docker-compose.yml to set your DISCORD_TOKEN
+docker-compose up -d
+```
+
+### Option 3: Direct Docker Run
+
+```bash
+docker run -d \
+  --name rustbot \
+  --restart unless-stopped \
+  -e DISCORD_TOKEN=your_discord_token_here \
+  -e RUST_LOG=info \
+  --memory=256m \
+  --cpus=0.5 \
+  deekahy/rustbot:latest
+```
+
+## Development Setup
 
 ### Prerequisites
 

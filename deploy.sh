@@ -76,6 +76,23 @@ validate_token() {
     fi
 }
 
+# Function to check platform compatibility
+check_platform() {
+    local platform=$(uname -m)
+    case $platform in
+        x86_64|amd64)
+            print_status "Detected platform: linux/amd64"
+            ;;
+        aarch64|arm64)
+            print_status "Detected platform: linux/arm64"
+            ;;
+        *)
+            print_warning "Unsupported platform: $platform"
+            print_warning "This bot is optimized for linux/amd64 and linux/arm64"
+            ;;
+    esac
+}
+
 # Function to show usage
 show_usage() {
     echo "RustBot Deployment Script"
@@ -85,12 +102,13 @@ show_usage() {
     echo "Commands:"
     echo "  start     Start the bot (development mode - builds from source)"
     echo "  prod      Start the bot (production mode - uses Docker Hub image)"
+    echo "  casaos    Start the bot (CasaOS mode - optimized for CasaOS)"
     echo "  stop      Stop the bot"
     echo "  restart   Restart the bot"
     echo "  logs      Show bot logs"
     echo "  status    Show bot status"
     echo "  update    Pull latest image and restart (production mode only)"
-    echo "  build     Build the Docker image locally"
+    echo "  build     Build and optionally push multi-platform image"
     echo "  clean     Clean up containers and images"
     echo "  setup     Initial setup (create .env file)"
     echo ""
@@ -98,6 +116,7 @@ show_usage() {
     echo "  $0 setup     # First time setup"
     echo "  $0 start     # Start development bot"
     echo "  $0 prod      # Start production bot"
+    echo "  $0 casaos    # Start CasaOS optimized bot"
     echo "  $0 logs      # View logs"
     echo "  $0 stop      # Stop the bot"
 }
@@ -139,6 +158,7 @@ EOF
 start_dev() {
     print_status "Starting RustBot in development mode..."
     check_docker
+    check_platform
     check_env_file
     validate_token
 
@@ -150,6 +170,7 @@ start_dev() {
 start_prod() {
     print_status "Starting RustBot in production mode..."
     check_docker
+    check_platform
     check_env_file
     validate_token
 
@@ -159,12 +180,32 @@ start_prod() {
     print_status "View logs with: $0 logs"
 }
 
+start_casaos() {
+    print_status "Starting RustBot in CasaOS mode..."
+    check_docker
+    check_platform
+    check_env_file
+    validate_token
+
+    if [ ! -f docker-compose.casaos.yml ]; then
+        print_error "docker-compose.casaos.yml not found!"
+        print_error "This file is required for CasaOS deployment"
+        exit 1
+    fi
+
+    docker-compose -f docker-compose.casaos.yml up -d
+    print_success "RustBot started in CasaOS mode!"
+    print_status "Optimized for CasaOS environment"
+    print_status "View logs with: $0 logs"
+}
+
 stop_bot() {
     print_status "Stopping RustBot..."
 
-    # Try to stop both dev and prod versions
+    # Try to stop all versions
     docker-compose down 2>/dev/null || true
     docker-compose -f docker-compose.prod.yml down 2>/dev/null || true
+    docker-compose -f docker-compose.casaos.yml down 2>/dev/null || true
 
     print_success "RustBot stopped!"
 }
@@ -177,6 +218,8 @@ restart_bot() {
     # Check which compose file exists and was last used
     if docker ps -a --format "table {{.Names}}" | grep -q "rustbot-prod"; then
         start_prod
+    elif docker ps -a --format "table {{.Names}}" | grep -q "rustbot.*casaos"; then
+        start_casaos
     else
         start_dev
     fi
@@ -188,11 +231,13 @@ show_logs() {
     # Check which container is running
     if docker ps --format "table {{.Names}}" | grep -q "rustbot-prod"; then
         docker-compose -f docker-compose.prod.yml logs -f rustbot
+    elif docker ps --format "table {{.Names}}" | grep -q "rustbot.*casaos"; then
+        docker-compose -f docker-compose.casaos.yml logs -f rustbot
     elif docker ps --format "table {{.Names}}" | grep -q "rustbot"; then
         docker-compose logs -f rustbot
     else
         print_error "No RustBot container is currently running"
-        print_status "Start the bot with: $0 start or $0 prod"
+        print_status "Start the bot with: $0 start, $0 prod, or $0 casaos"
         exit 1
     fi
 }
@@ -227,12 +272,64 @@ update_bot() {
 }
 
 build_image() {
-    print_status "Building RustBot Docker image..."
+    print_status "Building RustBot Docker image with multi-platform support..."
     check_docker
 
-    docker build -t deekahy/rustbot:latest .
-    print_success "Docker image built successfully!"
-    print_status "You can now push it with: docker push deekahy/rustbot:latest"
+    # Check if buildx is available
+    if ! docker buildx version &> /dev/null; then
+        print_error "Docker Buildx is required for multi-platform builds"
+        print_error "Please update Docker to a version that includes Buildx"
+        exit 1
+    fi
+
+    # Prompt for Docker username
+    echo "Please enter your Docker Hub username (or press Enter for 'deekahy'):"
+    read -r DOCKER_USERNAME
+    DOCKER_USERNAME=${DOCKER_USERNAME:-deekahy}
+
+    # Create/use multiplatform builder
+    BUILDER_NAME="rustbot-builder"
+    if ! docker buildx ls | grep -q "$BUILDER_NAME"; then
+        print_status "Creating multiplatform builder..."
+        docker buildx create --name "$BUILDER_NAME" --driver docker-container --bootstrap
+        docker buildx use "$BUILDER_NAME"
+    else
+        print_status "Using existing multiplatform builder..."
+        docker buildx use "$BUILDER_NAME"
+    fi
+
+    # Ask about pushing to Docker Hub
+    echo ""
+    read -p "Do you want to build and push to Docker Hub? (y/N): " -n 1 -r
+    echo
+
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        # Check if user is logged in
+        if ! docker info | grep -q "Username:"; then
+            print_status "Logging in to Docker Hub..."
+            docker login
+        fi
+
+        # Build and push multi-platform image
+        print_status "Building and pushing multi-platform image..."
+        docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --tag "${DOCKER_USERNAME}/rustbot:latest" \
+            --push \
+            .
+        print_success "Multi-platform image built and pushed successfully!"
+        print_status "Image: ${DOCKER_USERNAME}/rustbot:latest"
+        print_status "Platforms: linux/amd64, linux/arm64"
+    else
+        # Build locally for current platform
+        print_status "Building for local platform only..."
+        docker buildx build \
+            --tag "${DOCKER_USERNAME}/rustbot:latest" \
+            --load \
+            .
+        print_success "Docker image built locally!"
+        print_status "Image: ${DOCKER_USERNAME}/rustbot:latest"
+    fi
 }
 
 clean_up() {
@@ -264,6 +361,9 @@ case "${1:-}" in
         ;;
     "prod")
         start_prod
+        ;;
+    "casaos")
+        start_casaos
         ;;
     "stop")
         stop_bot
