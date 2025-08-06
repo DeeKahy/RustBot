@@ -1,5 +1,5 @@
-# Rust build artifacts (keep for caching in new build process)
-# target/
+# Rust build artifacts
+target/
 
 # Git files (keep .git for auto-update functionality)
 # .git/
