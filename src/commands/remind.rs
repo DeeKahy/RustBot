@@ -15,6 +15,7 @@ struct Reminder {
     message: String,
     remind_at: DateTime<Utc>,
     created_at: DateTime<Utc>,
+    reply_to_message_id: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -36,9 +37,58 @@ const REMINDERS_FILE: &str = "/tmp/rustbot_reminders.json";
 
 fn load_reminders() -> RemindersData {
     match fs::read_to_string(REMINDERS_FILE) {
-        Ok(content) => serde_json::from_str(&content).unwrap_or_default(),
+        Ok(content) => {
+            // Try to parse as current format first
+            match serde_json::from_str::<RemindersData>(&content) {
+                Ok(data) => data,
+                Err(_) => {
+                    // If that fails, try to migrate from old format
+                    migrate_old_format(&content).unwrap_or_default()
+                }
+            }
+        }
         Err(_) => RemindersData::default(),
     }
+}
+
+fn migrate_old_format(content: &str) -> Option<RemindersData> {
+    // Try to parse as old format without reply_to_message_id
+    #[derive(Deserialize)]
+    struct OldReminder {
+        id: u64,
+        user_id: u64,
+        channel_id: u64,
+        message: String,
+        remind_at: DateTime<Utc>,
+        created_at: DateTime<Utc>,
+    }
+
+    #[derive(Deserialize)]
+    struct OldRemindersData {
+        reminders: Vec<OldReminder>,
+        next_id: u64,
+    }
+
+    let old_data: OldRemindersData = serde_json::from_str(content).ok()?;
+
+    let new_reminders = old_data
+        .reminders
+        .into_iter()
+        .map(|old_reminder| Reminder {
+            id: old_reminder.id,
+            user_id: old_reminder.user_id,
+            channel_id: old_reminder.channel_id,
+            message: old_reminder.message,
+            remind_at: old_reminder.remind_at,
+            created_at: old_reminder.created_at,
+            reply_to_message_id: None,
+        })
+        .collect();
+
+    Some(RemindersData {
+        reminders: new_reminders,
+        next_id: old_data.next_id,
+    })
 }
 
 fn save_reminders(data: &RemindersData) -> Result<(), Error> {
@@ -120,6 +170,16 @@ pub async fn remind_set(
     // Load existing reminders
     let mut data = load_reminders();
 
+    // Get the message ID this is replying to, if any (only for prefix commands)
+    let reply_to_message_id = match ctx {
+        poise::Context::Prefix(prefix_ctx) => prefix_ctx
+            .msg
+            .referenced_message
+            .as_ref()
+            .map(|msg| msg.id.get()),
+        _ => None, // Slash commands don't have message references
+    };
+
     // Create new reminder
     let reminder = Reminder {
         id: data.next_id,
@@ -128,6 +188,7 @@ pub async fn remind_set(
         message: message.trim().to_string(),
         remind_at,
         created_at: now,
+        reply_to_message_id,
     };
 
     // Add to list and increment ID
@@ -343,7 +404,7 @@ async fn check_and_send_reminders(http: &serenity::Http) -> Result<(), Error> {
 
             let embed = CreateEmbed::new()
                 .title("⏰ Reminder!")
-                .description(format!("**{}**\n\n{}", reminder.message, user_mention))
+                .description(&reminder.message)
                 .color(Color::GOLD)
                 .footer(CreateEmbedFooter::new(format!(
                     "Set {} ago",
@@ -351,15 +412,19 @@ async fn check_and_send_reminders(http: &serenity::Http) -> Result<(), Error> {
                 )))
                 .timestamp(now);
 
-            match channel_id
-                .send_message(
-                    http,
-                    serenity::CreateMessage::new()
-                        .content(&user_mention)
-                        .embed(embed),
-                )
-                .await
-            {
+            let mut message_builder = serenity::CreateMessage::new()
+                .content(&user_mention)
+                .embed(embed);
+
+            // Add reply reference if this reminder was set as a reply
+            if let Some(reply_msg_id) = reminder.reply_to_message_id {
+                message_builder = message_builder.reference_message((
+                    serenity::ChannelId::new(reminder.channel_id),
+                    serenity::MessageId::new(reply_msg_id),
+                ));
+            }
+
+            match channel_id.send_message(http, message_builder).await {
                 Ok(_) => {
                     log::info!("Sent reminder {} to user {}", reminder.id, reminder.user_id);
                     sent_reminders.push(i);

@@ -359,13 +359,20 @@ Bot: ⏰ Reminder!
      @YourUsername
      Set 30 minutes ago
 
-User: !remind set 2h Call mom
+User: [Replies to someone's message] !remind set 2h Call mom
 Bot: ⏰ Reminder Set!
      Message: Call mom
      Remind at: Today at 5:30 PM
      Reminder ID: 2
 
-User: /remind remove 2
+[2 hours later, bot replies to the original message]
+Bot: [Replying to the original message] ⏰ Reminder!
+     Call mom
+     
+     @YourUsername
+     Set 2 hours ago
+
+User: /remind remove 3
 Bot: 🗑️ Reminder Removed
      Removed: Call mom
 
@@ -417,10 +424,12 @@ The reminder system allows users to set personal reminders that will be delivere
 - **Multiple reminders**: Set as many as you need
 - **Easy management**: List, remove, or clear all reminders
 - **Cross-channel delivery**: Reminders are sent where they were originally set
+- **Reply-to-message support**: When you set a reminder while replying to someone, the reminder will reply to that same message (without pinging the original author)
 
 ### 📝 **Commands**
 - **`-remind set <time> <message>`**: Set a new reminder
   - Example: `-remind set 1h30m Meeting with team`
+  - **Reply feature**: Use this while replying to a message to get reminded about that specific message
 - **`-remind list`**: Show all your active reminders with IDs and times
 - **`-remind remove <id>`**: Remove a specific reminder by ID
 - **`-remind clear`**: Remove all your reminders at once
@@ -429,13 +438,15 @@ The reminder system allows users to set personal reminders that will be delivere
 1. Reminders are stored in JSON format with unique IDs
 2. Background task checks every minute for due reminders
 3. When time arrives, reminder is sent as a mention in the original channel
-4. Delivered reminders are automatically removed from storage
-5. All times are calculated from when the reminder was set
+4. If the reminder was set as a reply, it will reply to the original message (mentioning you but not the original author)
+5. Delivered reminders are automatically removed from storage
+6. All times are calculated from when the reminder was set
 
 ### 💾 **Data Storage**
 - Reminders are stored in `/tmp/rustbot_reminders.json`
-- Each reminder includes: ID, user ID, channel ID, message, remind time, and creation time
+- Each reminder includes: ID, user ID, channel ID, message, remind time, creation time, and optional reply-to message ID
 - File persists between bot restarts for reliability
+- Automatic migration from older reminder formats for backwards compatibility
 
 ## Command Types
 
