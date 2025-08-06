@@ -5,6 +5,7 @@ pub mod hello;
 pub mod pfp;
 pub mod ping;
 pub mod spamping;
+pub mod stats;
 pub mod uwu;
 pub mod yourmom;
 
@@ -14,6 +15,7 @@ pub use hello::hello;
 pub use pfp::pfp;
 pub use ping::ping;
 pub use spamping::spamping;
+pub use stats::stats;
 pub use uwu::uwu;
 pub use yourmom::yourmom;
 
