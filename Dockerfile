@@ -123,6 +123,13 @@ while true; do
 
         sleep 2
         continue
+    # Exit code 43 means kys command was used (1-hour cooldown)
+    elif [ $exit_code -eq 43 ]; then
+        echo "💤 KYS command used, sleeping for 1 hour before restart..."
+        echo "⏰ Bot will restart automatically in 1 hour"
+        sleep 3600  # Sleep for 1 hour (3600 seconds)
+        echo "🌅 1-hour cooldown complete, restarting bot..."
+        continue
     else
         echo "🛑 Bot stopped with exit code $exit_code"
         exit $exit_code

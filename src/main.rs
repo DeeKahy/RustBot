@@ -8,7 +8,7 @@ use serenity::{ChannelId, Client, GatewayIntents};
 mod commands;
 
 use commands::{
-    cleanup, coinflip, hello, help, pfp, ping, poll, spamping, stats, update, uwu, yourmom,
+    cleanup, coinflip, hello, help, kys, pfp, ping, poll, spamping, stats, update, uwu, yourmom,
 };
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -16,6 +16,12 @@ type Context<'a> = poise::Context<'a, Data, Error>;
 
 #[derive(Serialize, Deserialize)]
 struct UpdateInfo {
+    channel_id: u64,
+    user_name: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct KysInfo {
     channel_id: u64,
     user_name: String,
 }
@@ -69,6 +75,7 @@ async fn main() {
                 yourmom(),
                 stats(),
                 update(),
+                kys(),
                 poll(),
                 cleanup(),
             ],
@@ -126,6 +133,42 @@ async fn main() {
                         // Clean up the update info file
                         if let Err(e) = fs::remove_file("/tmp/rustbot_update_info.json") {
                             log::warn!("Failed to remove update info file: {}", e);
+                        }
+                    }
+                }
+
+                // Check if this is a restart after a kys command (1-hour cooldown)
+                if let Ok(kys_info_str) = fs::read_to_string("/tmp/rustbot_kys_info.json") {
+                    if let Ok(kys_info) = serde_json::from_str::<KysInfo>(&kys_info_str) {
+                        let channel_id = ChannelId::new(kys_info.channel_id);
+                        match channel_id
+                            .say(
+                                &ctx.http,
+                                format!(
+                                    "🌅 Good morning! {} has awakened from their 1-hour slumber and is back online! 🤖",
+                                    _ready.user.name
+                                ),
+                            )
+                            .await
+                        {
+                            Ok(_) => {
+                                log::info!(
+                                    "Successfully sent post-kys startup message to channel {}",
+                                    kys_info.channel_id
+                                );
+                            }
+                            Err(e) => {
+                                log::error!(
+                                    "Failed to send kys startup message to channel {}: {}",
+                                    kys_info.channel_id,
+                                    e
+                                );
+                            }
+                        }
+
+                        // Clean up the kys info file
+                        if let Err(e) = fs::remove_file("/tmp/rustbot_kys_info.json") {
+                            log::warn!("Failed to remove kys info file: {}", e);
                         }
                     }
                 }

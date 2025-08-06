@@ -30,7 +30,7 @@ pub async fn spamping(
 
     if let serenity::Channel::Guild(guild_channel) = channel {
         // Create a new thread
-        let thread_name = format!("🚨 Spamping {} until they respond!", user.name);
+        let thread_name = format!("Spamping {} until they respond", user.name);
 
         let thread = match guild_channel
             .create_thread(
@@ -50,7 +50,7 @@ pub async fn spamping(
 
         // Send initial message
         let initial_msg = format!(
-            "🚨 **SPAM PING ACTIVATED** 🚨\n\n{}, you are being pinged every 10 seconds until you respond!\nType anything in this thread to stop the spam! 😈",
+            "**SPAM PING ACTIVATED**\n\n{}, you are being pinged every 10 seconds until you respond!\nType anything in this thread to stop the spam!",
             user.mention()
         );
 
@@ -61,7 +61,7 @@ pub async fn spamping(
 
         // Confirm to the user who started it
         ctx.say(format!(
-            "✅ Spam ping started for {} in {}! They will be pinged every 10 seconds until they respond.",
+            "Spam ping started for {} in {}! They will be pinged every 10 seconds until they respond.",
             user.mention(),
             thread.mention()
         )).await?;
@@ -91,10 +91,15 @@ pub async fn spamping(
                     });
 
                     if user_responded {
-                        let _ = thread_id.say(&http, format!(
-                            "🎉 {} responded! Spam ping stopped after {} pings. Welcome back to the land of the living! 🎉",
-                            user_mention, ping_count
-                        )).await;
+                        let _ = thread_id
+                            .say(
+                                &http,
+                                format!(
+                                    "{} responded! Spam ping stopped after {} pings.",
+                                    user_mention, ping_count
+                                ),
+                            )
+                            .await;
                         break;
                     }
                 }
@@ -102,24 +107,21 @@ pub async fn spamping(
                 // Send the ping
                 ping_count += 1;
                 let ping_msg = match ping_count {
-                    1..=5 => format!(
-                        "🔔 Ping #{}: {} - Please respond!",
-                        ping_count, user_mention
-                    ),
+                    1..=5 => format!("Ping #{}: {} - Please respond!", ping_count, user_mention),
                     6..=10 => format!(
-                        "📢 Ping #{}: {} - HELLO?! Are you there?",
+                        "Ping #{}: {} - HELLO?! Are you there?",
                         ping_count, user_mention
                     ),
                     11..=15 => format!(
-                        "🚨 Ping #{}: {} - EMERGENCY PING! RESPOND NOW!",
+                        "Ping #{}: {} - EMERGENCY PING! RESPOND NOW!",
                         ping_count, user_mention
                     ),
                     16..=20 => format!(
-                        "💀 Ping #{}: {} - Are you still alive?! RESPOND!",
+                        "Ping #{}: {} - Are you still alive?! RESPOND!",
                         ping_count, user_mention
                     ),
                     _ => format!(
-                        "♾️ Ping #{}: {} - This is getting ridiculous... please respond!",
+                        "Ping #{}: {} - This is getting ridiculous... please respond!",
                         ping_count, user_mention
                     ),
                 };
@@ -131,10 +133,15 @@ pub async fn spamping(
 
                 // Stop after 50 pings (about 8 minutes) to prevent infinite spam
                 if ping_count >= 50 {
-                    let _ = thread_id.say(&http, format!(
-                        "🛑 Spam ping stopped after 50 attempts. {} might be AFK or ignoring us... 😢",
+                    let _ = thread_id
+                        .say(
+                            &http,
+                            format!(
+                        "Spam ping stopped after 50 attempts. {} might be AFK or ignoring us...",
                         user_mention
-                    )).await;
+                    ),
+                        )
+                        .await;
                     break;
                 }
             }
