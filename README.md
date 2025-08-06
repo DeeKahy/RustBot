@@ -6,6 +6,7 @@ A modern Discord bot built with Rust using the Serenity library and Poise comman
 
 - 🏓 **Ping Command**: Basic ping-pong functionality with latency measurement
 - 👋 **Hello Command**: Friendly greeting command with optional name parameter
+- 📖 **Help Command**: Comprehensive help system showing all available commands
 - 🚨 **Spam Ping**: Creates a thread and repeatedly pings a user until they respond
 - 🎯 **UwU Command**: Transform text into uwu speak
 - 🪙 **Coin Flip**: Random coin flip command
@@ -22,6 +23,7 @@ A modern Discord bot built with Rust using the Serenity library and Poise comman
 
 - `-ping` - Responds with "Pong!" and shows latency
 - `-hello [name]` - Says hello to you or the specified name
+- `-help [command]` - Shows all available commands or detailed help for a specific command
 - `-spamping @user [count]` - Creates a thread and pings the user repeatedly
 - `-uwu <text>` - Transform text into uwu speak
 - `-coinflip` - Flip a coin (heads or tails)
@@ -301,6 +303,12 @@ Bot: 👋 Hello, YourUsername! Nice to meet you!
 
 User: /hello World
 Bot: 👋 Hello, World! Nice to meet you!
+
+User: !help
+Bot: [Displays comprehensive help embed with all available commands organized by category]
+
+User: /help ping
+Bot: [Shows detailed help for the ping command including usage, examples, and parameters]
 
 User: !spamping @SomeUser
 Bot: ✅ Spam ping started for @SomeUser in #🚨-spamping-someuser-until-they-respond! They will be pinged every 10 seconds until they respond.

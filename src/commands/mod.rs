@@ -2,6 +2,7 @@
 pub mod coinflip;
 pub mod general;
 pub mod hello;
+pub mod help;
 pub mod pfp;
 pub mod ping;
 pub mod spamping;
@@ -12,6 +13,7 @@ pub mod yourmom;
 // Re-export all commands for easy access from main.rs
 pub use coinflip::coinflip;
 pub use hello::hello;
+pub use help::help;
 pub use pfp::pfp;
 pub use ping::ping;
 pub use spamping::spamping;

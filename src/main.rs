@@ -5,7 +5,7 @@ use serenity::{Client, GatewayIntents};
 
 mod commands;
 
-use commands::{coinflip, hello, pfp, ping, spamping, stats, uwu, yourmom};
+use commands::{coinflip, hello, help, pfp, ping, spamping, stats, uwu, yourmom};
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
@@ -51,6 +51,7 @@ async fn main() {
             commands: vec![
                 ping(),
                 hello(),
+                help(),
                 spamping(),
                 uwu(),
                 coinflip(),
