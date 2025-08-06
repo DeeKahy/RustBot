@@ -39,7 +39,7 @@ pub async fn update(ctx: Context<'_>) -> Result<(), Error> {
         Ok(output) => {
             if output.status.success() {
                 let stdout = String::from_utf8_lossy(&output.stdout);
-                log::info!("Git pull successful: {}", stdout);
+                log::info!("Git pull successful: {stdout}");
 
                 reply
                     .edit(
@@ -87,7 +87,7 @@ pub async fn update(ctx: Context<'_>) -> Result<(), Error> {
                             std::process::exit(42);
                         } else {
                             let stderr = String::from_utf8_lossy(&build_output.stderr);
-                            log::error!("Build failed: {}", stderr);
+                            log::error!("Build failed: {stderr}");
                             reply
                                 .edit(
                                     ctx,
@@ -100,19 +100,19 @@ pub async fn update(ctx: Context<'_>) -> Result<(), Error> {
                         }
                     }
                     Err(e) => {
-                        log::error!("Failed to run cargo build: {}", e);
+                        log::error!("Failed to run cargo build: {e}");
                         reply
                             .edit(
                                 ctx,
                                 poise::CreateReply::default()
-                                    .content(format!("❌ Failed to run cargo build: {}", e)),
+                                    .content(format!("❌ Failed to run cargo build: {e}")),
                             )
                             .await?;
                     }
                 }
             } else {
                 let stderr = String::from_utf8_lossy(&output.stderr);
-                log::error!("Git pull failed: {}", stderr);
+                log::error!("Git pull failed: {stderr}");
                 reply
                     .edit(
                         ctx,
@@ -125,12 +125,12 @@ pub async fn update(ctx: Context<'_>) -> Result<(), Error> {
             }
         }
         Err(e) => {
-            log::error!("Failed to run git pull: {}", e);
+            log::error!("Failed to run git pull: {e}");
             reply
                 .edit(
                     ctx,
                     poise::CreateReply::default()
-                        .content(format!("❌ Failed to run git pull: {}", e)),
+                        .content(format!("❌ Failed to run git pull: {e}")),
                 )
                 .await?;
         }

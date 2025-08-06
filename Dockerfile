@@ -1,5 +1,5 @@
 # Multi-stage build for optimized RustBot Docker image
-FROM rust:1.75 AS builder
+FROM rust:latest AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
@@ -18,7 +18,8 @@ COPY Cargo.toml Cargo.lock ./
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 
 # Build dependencies (this layer will be cached)
-RUN cargo build --release && rm -rf src
+# Remove Cargo.lock temporarily to avoid version conflicts, then rebuild it
+RUN rm -f Cargo.lock && cargo build --release && rm -rf src
 
 # Copy the actual source code
 COPY src ./src

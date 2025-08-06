@@ -13,7 +13,7 @@ use crate::{Context, Error};
 // Utility function to print raw API errors - useful for debugging
 #[allow(dead_code)]
 pub async fn print_api_error(ctx: Context<'_>, error: &Error) -> Result<(), Error> {
-    let error_msg = format!("❌ {}", error);
+    let error_msg = format!("❌ {error}");
     ctx.say(error_msg).await?;
     Ok(())
 }

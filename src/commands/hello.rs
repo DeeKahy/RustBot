@@ -10,9 +10,9 @@ pub async fn hello(
 
     let name = name.unwrap_or_else(|| ctx.author().name.clone());
 
-    let response = format!("👋 Hello, {}! Nice to meet you!", name);
+    let response = format!("👋 Hello, {name}! Nice to meet you!");
     if let Err(e) = ctx.say(response).await {
-        ctx.say(format!("❌ {}", e)).await?;
+        ctx.say(format!("❌ {e}")).await?;
     }
 
     Ok(())

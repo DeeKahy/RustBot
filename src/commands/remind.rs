@@ -212,8 +212,7 @@ pub async fn remind_set(
 
     // Save to file
     if let Err(e) = save_reminders(&data) {
-        ctx.say(format!("❌ Failed to save reminder: {}", e))
-            .await?;
+        ctx.say(format!("❌ Failed to save reminder: {e}")).await?;
         return Ok(());
     }
 
@@ -324,7 +323,7 @@ pub async fn remind_remove(
             let removed_reminder = data.reminders.remove(index);
 
             if let Err(e) = save_reminders(&data) {
-                ctx.say(format!("❌ Failed to save changes: {}", e)).await?;
+                ctx.say(format!("❌ Failed to save changes: {e}")).await?;
                 return Ok(());
             }
 
@@ -371,13 +370,13 @@ pub async fn remind_clear(ctx: Context<'_>) -> Result<(), Error> {
     }
 
     if let Err(e) = save_reminders(&data) {
-        ctx.say(format!("❌ Failed to save changes: {}", e)).await?;
+        ctx.say(format!("❌ Failed to save changes: {e}")).await?;
         return Ok(());
     }
 
     let embed = CreateEmbed::new()
         .title("🧹 Reminders Cleared")
-        .description(format!("Removed {} reminder(s)", removed_count))
+        .description(format!("Removed {removed_count} reminder(s)"))
         .color(Color::ORANGE)
         .timestamp(Utc::now());
 
@@ -400,7 +399,7 @@ pub fn start_reminder_checker(http: Arc<serenity::Http>) {
             interval.tick().await;
 
             if let Err(e) = check_and_send_reminders(&http).await {
-                log::error!("Error checking reminders: {}", e);
+                log::error!("Error checking reminders: {e}");
             }
         }
     });
@@ -467,7 +466,7 @@ fn format_duration(duration: Duration) -> String {
     let total_seconds = duration.num_seconds();
 
     if total_seconds < 60 {
-        format!("{}s", total_seconds)
+        format!("{total_seconds}s")
     } else if total_seconds < 3600 {
         format!("{}m", total_seconds / 60)
     } else if total_seconds < 86400 {

@@ -182,8 +182,7 @@ async fn show_command_help(ctx: Context<'_>, command_name: &str) -> Result<(), E
             ctx.send(
                 poise::CreateReply::default()
                     .content(format!(
-                        "❌ Command `{}` not found. Use `-help` to see all available commands.",
-                        command_name
+                        "❌ Command `{command_name}` not found. Use `-help` to see all available commands."
                     ))
                     .ephemeral(true),
             )
@@ -217,14 +216,14 @@ fn create_command_help_embed(info: &CommandInfo) -> serenity::CreateEmbed {
 
     if !info.examples.is_empty() {
         let examples_text = info.examples.join("\n");
-        embed = embed.field("💡 Examples", format!("```\n{}\n```", examples_text), false);
+        embed = embed.field("💡 Examples", format!("```\n{examples_text}\n```"), false);
     }
 
     if !info.parameters.is_empty() {
         let params_text = info
             .parameters
             .iter()
-            .map(|p| format!("• {}", p))
+            .map(|p| format!("• {p}"))
             .collect::<Vec<_>>()
             .join("\n");
         embed = embed.field("⚙️ Parameters", params_text, false);

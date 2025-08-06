@@ -78,8 +78,7 @@ pub async fn cleanup(
             {
                 Ok(msgs) => msgs,
                 Err(e) => {
-                    ctx.say(format!("❌ Error fetching messages: {}", e))
-                        .await?;
+                    ctx.say(format!("❌ Error fetching messages: {e}")).await?;
                     return Ok(());
                 }
             };
@@ -121,18 +120,14 @@ pub async fn cleanup(
                         .delete_messages(&ctx.serenity_context().http, &message_ids)
                         .await
                     {
-                        log::warn!("Failed to bulk delete messages: {}", e);
+                        log::warn!("Failed to bulk delete messages: {e}");
                         // Try individual deletion as fallback
                         for msg_id in message_ids {
                             if let Err(e) = channel_id
                                 .delete_message(&ctx.serenity_context().http, msg_id)
                                 .await
                             {
-                                log::warn!(
-                                    "Failed to delete message {} individually: {}",
-                                    msg_id,
-                                    e
-                                );
+                                log::warn!("Failed to delete message {msg_id} individually: {e}");
                             } else {
                                 deleted_count += 1;
                             }
@@ -151,8 +146,7 @@ pub async fn cleanup(
         }
 
         ctx.say(format!(
-            "✅ Cleanup complete! Deleted {} messages after the specified message.",
-            deleted_count
+            "✅ Cleanup complete! Deleted {deleted_count} messages after the specified message."
         ))
         .await?;
 
@@ -183,8 +177,7 @@ pub async fn cleanup(
     }
 
     ctx.say(format!(
-        "🧹 Starting cleanup of {} messages... This may take a while to avoid rate limits.",
-        delete_count
+        "🧹 Starting cleanup of {delete_count} messages... This may take a while to avoid rate limits."
     ))
     .await?;
 
@@ -204,8 +197,7 @@ pub async fn cleanup(
         {
             Ok(msgs) => msgs,
             Err(e) => {
-                ctx.say(format!("❌ Error fetching messages: {}", e))
-                    .await?;
+                ctx.say(format!("❌ Error fetching messages: {e}")).await?;
                 return Ok(());
             }
         };
@@ -234,14 +226,14 @@ pub async fn cleanup(
                 .delete_messages(&ctx.serenity_context().http, &message_ids)
                 .await
             {
-                log::warn!("Failed to bulk delete messages: {}", e);
+                log::warn!("Failed to bulk delete messages: {e}");
                 // Try individual deletion as fallback
                 for msg_id in &message_ids {
                     if let Err(e) = channel_id
                         .delete_message(&ctx.serenity_context().http, *msg_id)
                         .await
                     {
-                        log::warn!("Failed to delete message {} individually: {}", msg_id, e);
+                        log::warn!("Failed to delete message {msg_id} individually: {e}");
                     } else {
                         deleted_count += 1;
                     }
@@ -260,8 +252,7 @@ pub async fn cleanup(
     }
 
     ctx.say(format!(
-        "✅ Cleanup complete! Deleted {} messages.",
-        deleted_count
+        "✅ Cleanup complete! Deleted {deleted_count} messages."
     ))
     .await?;
 

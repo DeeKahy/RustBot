@@ -24,7 +24,7 @@ pub async fn yourmom(ctx: Context<'_>) -> Result<(), Error> {
     {
         Ok(members) => members,
         Err(e) => {
-            log::error!("Failed to fetch guild members: {}", e);
+            log::error!("Failed to fetch guild members: {e}");
             ctx.say(
                 "❌ Failed to fetch server members. Make sure I have the necessary permissions!",
             )
@@ -80,7 +80,7 @@ pub async fn yourmom(ctx: Context<'_>) -> Result<(), Error> {
     let builder = poise::CreateReply::default().embed(embed);
 
     if let Err(e) = ctx.send(builder).await {
-        ctx.say(format!("❌ Failed to send profile picture: {}", e))
+        ctx.say(format!("❌ Failed to send profile picture: {e}"))
             .await?;
     }
 
