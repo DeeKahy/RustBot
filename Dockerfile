@@ -15,6 +15,9 @@ RUN apt-get update && apt-get install -y \
 # Set the working directory
 WORKDIR /app
 
+# Add cache busting argument to ensure fresh git clone
+ARG CACHE_BUST=1
+
 # Clone the repository
 RUN git clone https://github.com/DeeKahy/RustBot.git .
 
