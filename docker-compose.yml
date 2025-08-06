@@ -1,0 +1,52 @@
+version: "3.8"
+
+services:
+  rustbot:
+    # Build locally with auto-update capability
+    build: .
+
+    container_name: rustbot
+    restart: unless-stopped
+
+    # Environment variables - these will be overridden by CasaOS
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN:-}
+      - RUST_LOG=${RUST_LOG:-info}
+      - RUST_BACKTRACE=${RUST_BACKTRACE:-1}
+
+    # Resource limits (recommended for production)
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+        reservations:
+          memory: 128M
+          cpus: "0.1"
+
+    # Health check to monitor bot status
+    healthcheck:
+      test: ["CMD", "pgrep", "rustbot"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Security options (removed read_only for git operations)
+    security_opt:
+      - no-new-privileges:true
+
+    # Networks
+    networks:
+      - rustbot-network
+
+networks:
+  rustbot-network:
+    driver: bridge
