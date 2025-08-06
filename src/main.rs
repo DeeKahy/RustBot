@@ -5,7 +5,7 @@ use serenity::{Client, GatewayIntents};
 
 mod commands;
 
-use commands::{coinflip, hello, pfp, ping, spamping, uwu};
+use commands::{coinflip, hello, pfp, ping, spamping, uwu, yourmom};
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
@@ -43,11 +43,20 @@ async fn main() {
     // Set gateway intents
     let intents = GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::DIRECT_MESSAGES
-        | GatewayIntents::MESSAGE_CONTENT;
+        | GatewayIntents::MESSAGE_CONTENT
+        | GatewayIntents::GUILD_MEMBERS;
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![ping(), hello(), spamping(), uwu(), coinflip(), pfp()],
+            commands: vec![
+                ping(),
+                hello(),
+                spamping(),
+                uwu(),
+                coinflip(),
+                pfp(),
+                yourmom(),
+            ],
             prefix_options: poise::PrefixFrameworkOptions {
                 prefix: Some("-".into()),
                 ..Default::default()

@@ -10,6 +10,7 @@ A modern Discord bot built with Rust using the Serenity library and Poise comman
 - 🎯 **UwU Command**: Transform text into uwu speak
 - 🪙 **Coin Flip**: Random coin flip command
 - 👤 **Profile Picture**: Get user's profile picture
+- 🎲 **Your Mom**: Displays a random server member's profile picture with a funny message
 - 🔧 **Modular Design**: Easy to add new commands and features
 - 📝 **Logging**: Built-in logging system for debugging and monitoring
 - ⚡ **Async**: Built with Tokio for high performance
@@ -25,6 +26,7 @@ A modern Discord bot built with Rust using the Serenity library and Poise comman
 - `-uwu <text>` - Transform text into uwu speak
 - `-coinflip` - Flip a coin (heads or tails)
 - `-pfp [user]` - Get user's profile picture
+- `-yourmom` - Shows a random server member's profile picture
 
 ## Quick Start with Docker (Recommended)
 
@@ -314,6 +316,14 @@ Bot: 🚨 Ping #4: @SomeUser - EMERGENCY PING! RESPOND NOW!
 ...
 SomeUser: I'm alive!
 Bot: 🎉 @SomeUser responded! Spam ping stopped after 4 pings. Welcome back to the land of the living! 🎉
+
+User: !yourmom
+Bot: [Embed with title "Your mom is RandomUser123!" showing RandomUser123's profile picture]
+     Description: "Behold, the chosen one: RandomUser123"
+     Footer: "Requested by YourUsername • Total members: 47"
+
+User: /yourmom
+Bot: [Same embed but triggered via slash command]
 ```
 
 ## SpamPing Command Details

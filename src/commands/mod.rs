@@ -6,6 +6,7 @@ pub mod pfp;
 pub mod ping;
 pub mod spamping;
 pub mod uwu;
+pub mod yourmom;
 
 // Re-export all commands for easy access from main.rs
 pub use coinflip::coinflip;
@@ -14,6 +15,7 @@ pub use pfp::pfp;
 pub use ping::ping;
 pub use spamping::spamping;
 pub use uwu::uwu;
+pub use yourmom::yourmom;
 
 // You can add more command modules here as needed
 // Example:
