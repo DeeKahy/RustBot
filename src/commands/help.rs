@@ -51,7 +51,12 @@ async fn show_general_help(ctx: Context<'_>) -> Result<(), Error> {
         )
         .field(
             "📊 Utility Commands",
-            "• `-stats [count] [channel]` - Analyze message statistics in a channel",
+            "• `-stats [count] [channel]` - Analyze message statistics in a channel\n• `-poll <question? option1 option2...>` - Create a poll with reactions",
+            false
+        )
+        .field(
+            "🛠️ Moderation Commands",
+            "• `-cleanup [count|after]` - Delete messages (admin only)\n• `-update` - Update bot from GitHub (owner only)",
             false
         )
         .field(
@@ -128,6 +133,36 @@ async fn show_command_help(ctx: Context<'_>, command_name: &str) -> Result<(), E
                 "count (optional) - Number of messages to analyze (default: 1000, max: 10000)",
                 "channel (optional) - Channel to analyze (default: current channel)",
             ],
+        },
+        "poll" => CommandInfo {
+            name: "poll",
+            description: "Create a poll with a question and multiple options",
+            usage:
+                "`-poll <question? option1 option2...>` or `/poll <question? option1 option2...>`",
+            examples: vec![
+                "-poll Is this cool? yes no maybe",
+                "-poll Pizza or pasta? pizza pasta",
+            ],
+            parameters: vec![
+                "question? options - Question followed by space-separated options (max 10)",
+            ],
+        },
+        "cleanup" => CommandInfo {
+            name: "cleanup",
+            description: "Delete messages in the current channel (admin only)",
+            usage: "`-cleanup [count]` or `-cleanup after` (reply to message)",
+            examples: vec!["-cleanup 10", "-cleanup 50", "-cleanup after"],
+            parameters: vec![
+                "count (optional) - Number of messages to delete (default: 10, max: 1000)",
+                "after - Delete all messages after the replied message",
+            ],
+        },
+        "update" => CommandInfo {
+            name: "update",
+            description: "Update bot by pulling latest changes from GitHub (owner only)",
+            usage: "`-update` or `/update`",
+            examples: vec!["-update"],
+            parameters: vec![],
         },
         "help" => CommandInfo {
             name: "help",
