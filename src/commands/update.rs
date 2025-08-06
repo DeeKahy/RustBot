@@ -29,7 +29,7 @@ pub async fn update(ctx: Context<'_>) -> Result<(), Error> {
     // Reset any local changes first (handles deleted files)
     let branch = get_git_branch();
     let git_reset = Command::new("git")
-        .args(["reset", "--hard", &format!("origin/{}", branch)])
+        .args(["reset", "--hard", &format!("origin/{branch}")])
         .current_dir("/app")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
