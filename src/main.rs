@@ -85,7 +85,21 @@ async fn main() {
             Box::pin(async move {
                 log::info!("Logged in as {}", _ready.user.name);
                 println!("🤖 {} is online and ready!", _ready.user.name);
-                poise::builtins::register_globally(ctx, &framework.options().commands).await?;
+
+                // Log all registered commands for debugging
+                let commands = &framework.options().commands;
+                log::info!("Registering {} commands:", commands.len());
+                for command in commands {
+                    log::info!(
+                        "  - {} (prefix: {}, slash: {})",
+                        command.name,
+                        command.prefix_action.is_some(),
+                        command.slash_action.is_some()
+                    );
+                }
+
+                poise::builtins::register_globally(ctx, commands).await?;
+                log::info!("All commands registered successfully");
                 Ok(Data {})
             })
         })
