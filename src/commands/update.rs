@@ -1,6 +1,14 @@
 use crate::{Context, Error};
 
+use serde::{Deserialize, Serialize};
+use std::fs;
 use std::process::{Command, Stdio};
+
+#[derive(Serialize, Deserialize)]
+struct UpdateInfo {
+    channel_id: u64,
+    user_name: String,
+}
 
 /// Update the bot by pulling latest changes from GitHub and restarting
 #[poise::command(slash_command, prefix_command)]
@@ -59,6 +67,16 @@ pub async fn update(ctx: Context<'_>) -> Result<(), Error> {
                                         .content("✅ Compilation successful!\n🔄 Restarting bot in 3 seconds..."),
                                 )
                                 .await?;
+
+                            // Store update info for startup message
+                            let update_info = UpdateInfo {
+                                channel_id: ctx.channel_id().get(),
+                                user_name: ctx.author().name.clone(),
+                            };
+
+                            if let Ok(update_json) = serde_json::to_string(&update_info) {
+                                let _ = fs::write("/tmp/rustbot_update_info.json", update_json);
+                            }
 
                             // Wait a moment before exiting
                             tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;

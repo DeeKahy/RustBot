@@ -1,7 +1,9 @@
 use std::env;
+use std::fs;
 
 use poise::serenity_prelude as serenity;
-use serenity::{Client, GatewayIntents};
+use serde::{Deserialize, Serialize};
+use serenity::{ChannelId, Client, GatewayIntents};
 
 mod commands;
 
@@ -11,6 +13,12 @@ use commands::{
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
+
+#[derive(Serialize, Deserialize)]
+struct UpdateInfo {
+    channel_id: u64,
+    user_name: String,
+}
 
 // User data, which is stored and accessible in all command invocations
 pub struct Data {}
@@ -85,6 +93,42 @@ async fn main() {
             Box::pin(async move {
                 log::info!("Logged in as {}", _ready.user.name);
                 println!("🤖 {} is online and ready!", _ready.user.name);
+
+                // Check if this is a restart after an update
+                if let Ok(update_info_str) = fs::read_to_string("/tmp/rustbot_update_info.json") {
+                    if let Ok(update_info) = serde_json::from_str::<UpdateInfo>(&update_info_str) {
+                        let channel_id = ChannelId::new(update_info.channel_id);
+                        match channel_id
+                            .say(
+                                &ctx.http,
+                                format!(
+                                    "✅ Update complete! {} is back online and ready! 🤖",
+                                    _ready.user.name
+                                ),
+                            )
+                            .await
+                        {
+                            Ok(_) => {
+                                log::info!(
+                                    "Successfully sent post-update startup message to channel {}",
+                                    update_info.channel_id
+                                );
+                            }
+                            Err(e) => {
+                                log::error!(
+                                    "Failed to send startup message to channel {}: {}",
+                                    update_info.channel_id,
+                                    e
+                                );
+                            }
+                        }
+
+                        // Clean up the update info file
+                        if let Err(e) = fs::remove_file("/tmp/rustbot_update_info.json") {
+                            log::warn!("Failed to remove update info file: {}", e);
+                        }
+                    }
+                }
 
                 // Log all registered commands for debugging
                 let commands = &framework.options().commands;

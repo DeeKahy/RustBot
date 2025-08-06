@@ -1274,6 +1274,8 @@ dependencies = [
  "log",
  "poise",
  "rand",
+ "serde",
+ "serde_json",
  "serenity",
  "tokio",
 ]
