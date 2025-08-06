@@ -31,7 +31,7 @@ A modern Discord bot built with Rust using the Serenity library and Poise comman
 - `-pfp [user]` - Get user's profile picture
 - `-yourmom` - Shows a random server member's profile picture
 - `-kys` - Reboot bot with 1-hour cooldown
-- `-remind set <time> <message>` - Set a reminder (e.g., `5m`, `1h`, `2d`)
+- `-remind set <time> [message]` - Set a reminder (message optional when replying)
 - `-remind list` - List your active reminders
 - `-remind remove <id>` - Remove a specific reminder
 - `-remind clear` - Clear all your reminders
@@ -345,6 +345,18 @@ Bot: ⏰ Reminder Set!
      Remind at: Today at 3:45 PM
      Reminder ID: 1
 
+User: [Replies to someone's message about "team lunch"] !remind set 15m
+Bot: ⏰ Reminder Set!
+     Message: ⏰ Reminder
+     Remind at: Today at 3:30 PM
+     Reminder ID: 2
+
+User: [Replies to someone's message] !remind set 1h Check on this
+Bot: ⏰ Reminder Set!
+     Message: Check on this
+     Remind at: Today at 4:15 PM
+     Reminder ID: 3
+
 User: /remind list
 Bot: 📋 Your Active Reminders
      ID 1: Take out the trash
@@ -364,6 +376,20 @@ Bot: ⏰ Reminder Set!
      Message: Call mom
      Remind at: Today at 5:30 PM
      Reminder ID: 2
+
+[15 minutes later, bot replies to the "team lunch" message]
+Bot: [Replying to the "team lunch" message] ⏰ Reminder!
+     ⏰ Reminder
+     
+     @YourUsername
+     Set 15 minutes ago
+
+[1 hour later, bot replies to the original message]
+Bot: [Replying to the original message] ⏰ Reminder!
+     Check on this
+     
+     @YourUsername
+     Set 1 hour ago
 
 [2 hours later, bot replies to the original message]
 Bot: [Replying to the original message] ⏰ Reminder!
@@ -427,9 +453,11 @@ The reminder system allows users to set personal reminders that will be delivere
 - **Reply-to-message support**: When you set a reminder while replying to someone, the reminder will reply to that same message (without pinging the original author)
 
 ### 📝 **Commands**
-- **`-remind set <time> <message>`**: Set a new reminder
+- **`-remind set <time> [message]`**: Set a new reminder
   - Example: `-remind set 1h30m Meeting with team`
   - **Reply feature**: Use this while replying to a message to get reminded about that specific message
+  - **No message needed**: When replying to a message, you can omit the message: `-remind set 30m`
+  - **With custom message**: Or provide a custom message: `-remind set 30m Check on this later`
 - **`-remind list`**: Show all your active reminders with IDs and times
 - **`-remind remove <id>`**: Remove a specific reminder by ID
 - **`-remind clear`**: Remove all your reminders at once

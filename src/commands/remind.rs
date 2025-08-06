@@ -139,21 +139,36 @@ pub async fn remind(_ctx: Context<'_>) -> Result<(), Error> {
 pub async fn remind_set(
     ctx: Context<'_>,
     #[description = "Time duration (e.g., 5m, 1h, 2d)"] time: String,
-    #[description = "Reminder message"]
+    #[description = "Reminder message (optional when replying to a message)"]
     #[rest]
-    message: String,
+    message: Option<String>,
 ) -> Result<(), Error> {
     log::info!(
-        "Remind set command called by {} with time: '{}' and message: '{}'",
+        "Remind set command called by {} with time: '{}' and message: '{:?}'",
         ctx.author().name,
         time,
         message
     );
 
-    if message.trim().is_empty() {
-        ctx.say("❌ Please provide a reminder message!").await?;
-        return Ok(());
-    }
+    // Check if we have a message or if we're replying to something
+    let has_reply = match ctx {
+        poise::Context::Prefix(prefix_ctx) => prefix_ctx.msg.referenced_message.is_some(),
+        _ => false,
+    };
+
+    let reminder_message = match message {
+        Some(msg) if !msg.trim().is_empty() => msg.trim().to_string(),
+        Some(_) if has_reply => "⏰ Reminder".to_string(), // Empty message but has reply
+        Some(_) => {
+            ctx.say("❌ Please provide a reminder message!").await?;
+            return Ok(());
+        }
+        None if has_reply => "⏰ Reminder".to_string(), // No message but has reply
+        None => {
+            ctx.say("❌ Please provide a reminder message!").await?;
+            return Ok(());
+        }
+    };
 
     let duration = match parse_time_duration(&time) {
         Some(d) => d,
@@ -185,7 +200,7 @@ pub async fn remind_set(
         id: data.next_id,
         user_id: ctx.author().id.get(),
         channel_id: ctx.channel_id().get(),
-        message: message.trim().to_string(),
+        message: reminder_message,
         remind_at,
         created_at: now,
         reply_to_message_id,
