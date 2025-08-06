@@ -145,7 +145,7 @@ async fn main() {
                             .say(
                                 &ctx.http,
                                 format!(
-                                    "🌅 Good morning! {} has awakened from their 1-hour slumber and is back online! 🤖",
+                                    "Good morning! {} has awakened from their 1-hour slumber and is back online!",
                                     _ready.user.name
                                 ),
                             )

@@ -12,12 +12,12 @@ struct KysInfo {
 /// Reboot the bot with a 1-hour cooldown
 #[poise::command(slash_command, prefix_command)]
 pub async fn kys(ctx: Context<'_>) -> Result<(), Error> {
-    ctx.say("🔄 Starting reboot process with 1-hour cooldown...")
+    ctx.say("Starting reboot process with 1-hour cooldown...")
         .await?;
 
     // Create a follow-up message that we can edit
     let reply = ctx
-        .say("⏰ Bot will shutdown for 1 hour and then restart automatically...")
+        .say("Bot will shutdown for 1 hour and then restart automatically...")
         .await?;
 
     // Store kys info for startup message
@@ -34,7 +34,7 @@ pub async fn kys(ctx: Context<'_>) -> Result<(), Error> {
         .edit(
             ctx,
             poise::CreateReply::default().content(
-                "💤 Going to sleep for 1 hour... See you later! 😴\n⏰ Bot will automatically restart in 1 hour.",
+                "Going to sleep for 1 hour... See you later!\nBot will automatically restart in 1 hour.",
             ),
         )
         .await?;
