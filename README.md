@@ -35,6 +35,7 @@ A modern Discord bot built with Rust using the Serenity library and Poise comman
 - `-remind list` - List your active reminders
 - `-remind remove <id>` - Remove a specific reminder
 - `-remind clear` - Clear all your reminders
+- `-react <text>` - Add emoji reactions to a replied message spelling out the text
 
 ## Quick Start with Docker (Recommended)
 

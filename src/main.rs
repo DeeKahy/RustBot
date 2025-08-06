@@ -8,8 +8,8 @@ use serenity::{ChannelId, Client, GatewayIntents};
 mod commands;
 
 use commands::{
-    cleanup, coinflip, hello, help, kys, pfp, ping, poll, remind, spamping, start_reminder_checker,
-    stats, update, uwu, yourmom,
+    cleanup, coinflip, hello, help, kys, pfp, ping, poll, react, remind, spamping,
+    start_reminder_checker, stats, update, uwu, yourmom,
 };
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -80,6 +80,7 @@ async fn main() {
                 poll(),
                 cleanup(),
                 remind(),
+                react(),
             ],
             prefix_options: poise::PrefixFrameworkOptions {
                 prefix: Some("-".into()),

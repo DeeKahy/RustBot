@@ -51,7 +51,7 @@ async fn show_general_help(ctx: Context<'_>) -> Result<(), Error> {
         )
         .field(
             "📊 Utility Commands",
-            "• `-stats [count] [channel]` - Analyze message statistics in a channel\n• `-poll <question? option1 option2...>` - Create a poll with reactions",
+            "• `-stats [count] [channel]` - Analyze message statistics in a channel\n• `-poll <question? option1 option2...>` - Create a poll with reactions\n• `-react <text>` - Add emoji reactions to a replied message\n• `-remind <time> <message>` - Set a reminder for the future",
             false
         )
         .field(
@@ -170,6 +170,27 @@ async fn show_command_help(ctx: Context<'_>, command_name: &str) -> Result<(), E
             usage: "`-kys` or `/kys`",
             examples: vec!["-kys"],
             parameters: vec![],
+        },
+        "react" => CommandInfo {
+            name: "react",
+            description: "Add emoji reactions to a replied message, spelling out the provided text",
+            usage: "`-react <text>` (reply to a message)",
+            examples: vec!["-react lol", "-react cool", "-react 123"],
+            parameters: vec!["text - The text to spell out with emoji reactions"],
+        },
+        "remind" => CommandInfo {
+            name: "remind",
+            description: "Set a reminder that will be sent to you at a specified time",
+            usage: "`-remind <time> <message>` or `/remind <time> <message>`",
+            examples: vec![
+                "-remind 30m Take a break",
+                "-remind 2h Check the oven",
+                "-remind tomorrow Call mom",
+            ],
+            parameters: vec![
+                "time - When to remind (e.g., 30m, 2h, 1d, tomorrow)",
+                "message - The reminder message",
+            ],
         },
         "help" => CommandInfo {
             name: "help",
