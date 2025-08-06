@@ -2,11 +2,8 @@ version: "3.8"
 
 services:
   rustbot:
-    # Use pre-built multi-platform image (recommended)
-    image: deekahy/rustbot:latest
-
-    # Uncomment to build locally instead
-    # build: .
+    # Build locally with auto-update capability
+    build: .
 
     container_name: rustbot
     restart: unless-stopped
@@ -42,10 +39,9 @@ services:
         max-size: "10m"
         max-file: "3"
 
-    # Security options
+    # Security options (removed read_only for git operations)
     security_opt:
       - no-new-privileges:true
-    read_only: true
 
     # Networks
     networks:

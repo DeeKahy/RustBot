@@ -2,7 +2,8 @@ version: "3.8"
 
 services:
   rustbot:
-    image: deekahy/rustbot:latest
+    # Build locally with auto-update capability
+    build: .
     container_name: rustbot
     restart: unless-stopped
 
@@ -10,6 +11,7 @@ services:
     environment:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
       - RUST_LOG=${RUST_LOG:-info}
+      - RUST_BACKTRACE=1
 
     # Minimal resource limits for CasaOS
     mem_limit: 256m
@@ -22,12 +24,11 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 15s
+      start_period: 60s
 
-    # Security
+    # Security (no read_only for git operations)
     security_opt:
       - no-new-privileges:true
-    read_only: true
 
     # Logging
     logging:

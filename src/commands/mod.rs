@@ -1,23 +1,29 @@
 // Commands module - imports all individual command files
+pub mod cleanup;
 pub mod coinflip;
 pub mod general;
 pub mod hello;
 pub mod help;
 pub mod pfp;
 pub mod ping;
+pub mod poll;
 pub mod spamping;
 pub mod stats;
+pub mod update;
 pub mod uwu;
 pub mod yourmom;
 
 // Re-export all commands for easy access from main.rs
+pub use cleanup::cleanup;
 pub use coinflip::coinflip;
 pub use hello::hello;
 pub use help::help;
 pub use pfp::pfp;
 pub use ping::ping;
+pub use poll::poll;
 pub use spamping::spamping;
 pub use stats::stats;
+pub use update::update;
 pub use uwu::uwu;
 pub use yourmom::yourmom;
 

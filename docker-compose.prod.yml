@@ -2,13 +2,15 @@ version: "3.8"
 
 services:
   rustbot:
-    image: deekahy/rustbot:latest
+    # Build locally with auto-update capability
+    build: .
     container_name: rustbot-prod
     restart: unless-stopped
 
     environment:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
       - RUST_LOG=info
+      - RUST_BACKTRACE=1
 
     # Use .env file for environment variables
     env_file:
@@ -19,7 +21,7 @@ services:
       resources:
         limits:
           memory: 512M
-          cpus: "0.5"
+          cpus: "1.0"
         reservations:
           memory: 256M
           cpus: "0.25"
@@ -30,14 +32,14 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 60s
 
     # Logging configuration
     logging:
       driver: "json-file"
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: "20m"
+        max-file: "5"
 
     # Networks
     networks:
@@ -47,20 +49,11 @@ services:
     labels:
       - "com.rustbot.environment=production"
       - "com.rustbot.service=discord-bot"
+      - "com.rustbot.auto-update=enabled"
 
-  # Watchtower for automatic updates
-  watchtower:
-    image: containrrr/watchtower
-    container_name: rustbot-watchtower
-    restart: unless-stopped
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: --interval 3600 rustbot-prod --cleanup
-    networks:
-      - rustbot-network
-    labels:
-      - "com.rustbot.environment=production"
-      - "com.rustbot.service=auto-updater"
+    # Security options (no read_only for git operations)
+    security_opt:
+      - no-new-privileges:true
 
 networks:
   rustbot-network:

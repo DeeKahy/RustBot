@@ -1,8 +1,8 @@
-# Rust build artifacts
-target/
+# Rust build artifacts (keep for caching in new build process)
+# target/
 
-# Git files
-.git/
+# Git files (keep .git for auto-update functionality)
+# .git/
 .gitignore
 .gitattributes
 
@@ -27,9 +27,9 @@ LICENSE
 .DS_Store
 Thumbs.db
 
-# Docker files
-Dockerfile
-.dockerignore
+# Docker files (keep for potential multi-stage builds)
+# Dockerfile
+# .dockerignore
 
 # Logs
 *.log
@@ -37,3 +37,6 @@ Dockerfile
 # Temporary files
 tmp/
 temp/
+
+# Local startup script (Docker has its own embedded version)
+startup.sh

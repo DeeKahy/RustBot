@@ -5,7 +5,9 @@ use serenity::{Client, GatewayIntents};
 
 mod commands;
 
-use commands::{coinflip, hello, help, pfp, ping, spamping, stats, uwu, yourmom};
+use commands::{
+    cleanup, coinflip, hello, help, pfp, ping, poll, spamping, stats, update, uwu, yourmom,
+};
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
@@ -58,6 +60,9 @@ async fn main() {
                 pfp(),
                 yourmom(),
                 stats(),
+                update(),
+                poll(),
+                cleanup(),
             ],
             prefix_options: poise::PrefixFrameworkOptions {
                 prefix: Some("-".into()),
