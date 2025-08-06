@@ -2,8 +2,8 @@ version: "3.8"
 
 services:
   rustbot:
-    # Build locally with auto-update capability
-    build: .
+    # Use published multi-platform image from Docker Hub
+    image: deekahy/rustbot:latest
 
     container_name: rustbot
     restart: unless-stopped
