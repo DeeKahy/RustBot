@@ -34,13 +34,13 @@ pub struct Data {}
 async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
     // This is our global error handler
     match error {
-        poise::FrameworkError::Setup { error, .. } => panic!("Failed to start bot: {:?}", error),
+        poise::FrameworkError::Setup { error, .. } => panic!("Failed to start bot: {error:?}"),
         poise::FrameworkError::Command { error, ctx, .. } => {
             println!("Error in command `{}`: {:?}", ctx.command().name, error,);
         }
         error => {
             if let Err(e) = poise::builtins::on_error(error).await {
-                println!("Error while handling error: {}", e)
+                println!("Error while handling error: {e}")
             }
         }
     }
@@ -136,7 +136,7 @@ async fn main() {
 
                         // Clean up the update info file
                         if let Err(e) = fs::remove_file("/tmp/rustbot_update_info.json") {
-                            log::warn!("Failed to remove update info file: {}", e);
+                            log::warn!("Failed to remove update info file: {e}");
                         }
                     }
                 }
@@ -172,7 +172,7 @@ async fn main() {
 
                         // Clean up the kys info file
                         if let Err(e) = fs::remove_file("/tmp/rustbot_kys_info.json") {
-                            log::warn!("Failed to remove kys info file: {}", e);
+                            log::warn!("Failed to remove kys info file: {e}");
                         }
                     }
                 }
@@ -209,6 +209,6 @@ async fn main() {
     // Start the bot
     log::info!("Starting bot...");
     if let Err(why) = client.start().await {
-        log::error!("Client error: {:?}", why);
+        log::error!("Client error: {why:?}");
     }
 }

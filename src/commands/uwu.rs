@@ -122,7 +122,7 @@ pub async fn uwu(
     };
 
     if let Err(e) = ctx.say(response).await {
-        ctx.say(format!("❌ {}", e)).await?;
+        ctx.say(format!("❌ {e}")).await?;
     }
 
     Ok(())

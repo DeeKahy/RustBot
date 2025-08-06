@@ -81,40 +81,32 @@ pub async fn react(
                     Ok(_) => {
                         used_emojis.insert(emoji);
                         reactions_added += 1;
-                        log::debug!("Added reaction {} for character '{}'", emoji, ch);
+                        log::debug!("Added reaction {emoji} for character '{ch}'");
 
                         // Small delay to avoid rate limiting
                         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
                     }
                     Err(e) => {
-                        log::warn!(
-                            "Failed to add reaction {} for character '{}': {}",
-                            emoji,
-                            ch,
-                            e
-                        );
+                        log::warn!("Failed to add reaction {emoji} for character '{ch}': {e}");
                     }
                 }
             } else {
-                log::debug!("No available emoji for character '{}' (all used)", ch);
+                log::debug!("No available emoji for character '{ch}' (all used)");
             }
         } else {
-            log::debug!("No emoji mapping for character '{}'", ch);
+            log::debug!("No emoji mapping for character '{ch}'");
         }
     }
 
     if reactions_added > 0 {
-        ctx.say(format!("✅ Added {} reactions!", reactions_added))
+        ctx.say(format!("✅ Added {reactions_added} reactions!"))
             .await?;
     } else {
         ctx.say("❌ Couldn't add any reactions. The emojis might already be used or unavailable.")
             .await?;
     }
 
-    log::info!(
-        "React command completed. Added {} reactions",
-        reactions_added
-    );
+    log::info!("React command completed. Added {reactions_added} reactions");
     Ok(())
 }
 

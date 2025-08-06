@@ -66,7 +66,7 @@ pub async fn poll(
     // Create embed
     let embed = CreateEmbed::new()
         .title("📊 Poll")
-        .description(format!("**{}**\n\n{}", question, options_text))
+        .description(format!("**{question}**\n\n{options_text}"))
         .color(Color::BLUE)
         .footer(CreateEmbedFooter::new(format!(
             "Poll created by {}",
@@ -87,7 +87,7 @@ pub async fn poll(
             .react(&ctx.http(), ReactionType::Unicode(emoji.to_string()))
             .await
         {
-            log::warn!("Failed to add reaction {}: {}", emoji, e);
+            log::warn!("Failed to add reaction {emoji}: {e}");
         }
     }
 

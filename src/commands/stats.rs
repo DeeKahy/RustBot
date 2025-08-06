@@ -50,8 +50,7 @@ pub async fn stats(
     // Send initial message
     let reply = ctx
         .say(format!(
-            "📊 Analyzing last {} messages in <#{}>...",
-            message_count, target_channel
+            "📊 Analyzing last {message_count} messages in <#{target_channel}>..."
         ))
         .await?;
 
@@ -75,7 +74,7 @@ pub async fn stats(
                     .edit(
                         ctx,
                         poise::CreateReply::default()
-                            .content(format!("❌ Error fetching messages: {}", e)),
+                            .content(format!("❌ Error fetching messages: {e}")),
                     )
                     .await?;
                 return Ok(());
@@ -96,8 +95,7 @@ pub async fn stats(
                 .edit(
                     ctx,
                     poise::CreateReply::default().content(format!(
-                        "📊 Analyzing messages... {}/{}",
-                        collected, message_count
+                        "📊 Analyzing messages... {collected}/{message_count}"
                     )),
                 )
                 .await?;

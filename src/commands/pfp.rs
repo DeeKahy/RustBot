@@ -29,7 +29,7 @@ pub async fn pfp(
     let builder = poise::CreateReply::default().embed(embed);
 
     if let Err(e) = ctx.send(builder).await {
-        ctx.say(format!("❌ Failed to send profile picture: {}", e))
+        ctx.say(format!("❌ Failed to send profile picture: {e}"))
             .await?;
     }
 

@@ -10,7 +10,7 @@ pub async fn ping(ctx: Context<'_>) -> Result<(), Error> {
     let reply = match ctx.say("🏓 Pong!").await {
         Ok(reply) => reply,
         Err(e) => {
-            ctx.say(format!("❌ {}", e)).await?;
+            ctx.say(format!("❌ {e}")).await?;
             return Ok(());
         }
     };
@@ -22,11 +22,11 @@ pub async fn ping(ctx: Context<'_>) -> Result<(), Error> {
     if let Err(e) = reply
         .edit(
             ctx,
-            poise::CreateReply::default().content(format!("🏓 Pong! `{}ms`", latency)),
+            poise::CreateReply::default().content(format!("🏓 Pong! `{latency}ms`")),
         )
         .await
     {
-        ctx.say(format!("❌ {}", e)).await?;
+        ctx.say(format!("❌ {e}")).await?;
     }
 
     Ok(())

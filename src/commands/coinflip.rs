@@ -29,7 +29,7 @@ pub async fn coinflip(ctx: Context<'_>) -> Result<(), Error> {
             .edit(ctx, poise::CreateReply::default().content(animation_text))
             .await
         {
-            log::warn!("Failed to edit animation frame: {}", e);
+            log::warn!("Failed to edit animation frame: {e}");
             break;
         }
     }
@@ -56,7 +56,7 @@ pub async fn coinflip(ctx: Context<'_>) -> Result<(), Error> {
         .edit(ctx, poise::CreateReply::default().content(final_response))
         .await
     {
-        ctx.say(format!("❌ Failed to show result: {}", e)).await?;
+        ctx.say(format!("❌ Failed to show result: {e}")).await?;
     }
 
     Ok(())

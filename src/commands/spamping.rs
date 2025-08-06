@@ -43,7 +43,7 @@ pub async fn spamping(
         {
             Ok(thread) => thread,
             Err(e) => {
-                ctx.say(format!("❌ {}", e)).await?;
+                ctx.say(format!("❌ {e}")).await?;
                 return Ok(());
             }
         };
@@ -55,7 +55,7 @@ pub async fn spamping(
         );
 
         if let Err(e) = thread.say(&ctx.serenity_context().http, initial_msg).await {
-            ctx.say(format!("❌ {}", e)).await?;
+            ctx.say(format!("❌ {e}")).await?;
             return Ok(());
         }
 
@@ -94,10 +94,7 @@ pub async fn spamping(
                         let _ = thread_id
                             .say(
                                 &http,
-                                format!(
-                                    "{} responded! Spam ping stopped after {} pings.",
-                                    user_mention, ping_count
-                                ),
+                                format!("{user_mention} responded! Spam ping stopped after {ping_count} pings."),
                             )
                             .await;
                         break;
@@ -106,28 +103,24 @@ pub async fn spamping(
 
                 // Send the ping
                 ping_count += 1;
-                let ping_msg = match ping_count {
-                    1..=5 => format!("Ping #{}: {} - Please respond!", ping_count, user_mention),
+                let ping_message = match ping_count {
+                    1..=5 => format!("Ping #{ping_count}: {user_mention} - Please respond!"),
                     6..=10 => format!(
-                        "Ping #{}: {} - HELLO?! Are you there?",
-                        ping_count, user_mention
+                        "Ping #{ping_count}: {user_mention} - HELLO?! Are you there?"
                     ),
                     11..=15 => format!(
-                        "Ping #{}: {} - EMERGENCY PING! RESPOND NOW!",
-                        ping_count, user_mention
+                        "Ping #{ping_count}: {user_mention} - EMERGENCY PING! RESPOND NOW!"
                     ),
                     16..=20 => format!(
-                        "Ping #{}: {} - Are you still alive?! RESPOND!",
-                        ping_count, user_mention
+                        "Ping #{ping_count}: {user_mention} - Are you still alive?! RESPOND!"
                     ),
                     _ => format!(
-                        "Ping #{}: {} - This is getting ridiculous... please respond!",
-                        ping_count, user_mention
+                        "Ping #{ping_count}: {user_mention} - This is getting ridiculous... please respond!"
                     ),
                 };
 
-                if let Err(e) = thread_id.say(&http, ping_msg).await {
-                    let _ = thread_id.say(&http, format!("❌ {}", e)).await;
+                if let Err(e) = thread_id.say(&http, ping_message).await {
+                    let _ = thread_id.say(&http, format!("❌ {e}")).await;
                     break;
                 }
 
@@ -136,10 +129,7 @@ pub async fn spamping(
                     let _ = thread_id
                         .say(
                             &http,
-                            format!(
-                        "Spam ping stopped after 50 attempts. {} might be AFK or ignoring us...",
-                        user_mention
-                    ),
+                            format!("Spam ping stopped after 50 attempts. {user_mention} might be AFK or ignoring us..."),
                         )
                         .await;
                     break;
