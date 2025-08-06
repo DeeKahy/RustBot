@@ -39,4 +39,4 @@ tmp/
 temp/
 
 # Local startup script (Docker has its own embedded version)
-startup.sh
+# startup.sh

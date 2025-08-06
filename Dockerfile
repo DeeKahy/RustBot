@@ -1,48 +1,68 @@
-# Multi-stage build for optimized RustBot Docker image
-FROM rust:1.85-slim AS builder
+# syntax=docker/dockerfile:1
+
+# ---- Build Stage ----
+FROM rust:1.85-slim as builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
     ca-certificates \
-    binutils \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
-# Set the working directory
 WORKDIR /app
 
-# Copy dependency files first for better caching
+# Copy manifests and source for caching
 COPY Cargo.toml Cargo.lock ./
-
-# Create a dummy main.rs to build dependencies
 RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN cargo build --release || true
+RUN rm -rf src
 
-# Build dependencies (this layer will be cached)
-# Remove Cargo.lock temporarily to avoid version conflicts, then rebuild it
-RUN rm -f Cargo.lock && cargo build --release && rm -rf src
+# Copy the rest of the source and .git for self-update
+COPY . .
+# Ensure .git is present for update commands
+RUN [ -d ".git" ] || (echo "Missing .git directory! Clone with --recurse-submodules and include .git." && false)
 
-# Copy the actual source code
-COPY src ./src
-
-# Build the application
+# Build the actual binary
 RUN cargo build --release
 
-# Strip the binary to reduce size
-RUN strip /app/target/release/rustbot
+# ---- Runtime Stage ----
+FROM debian:bookworm-slim
 
-# Runtime stage - use distroless for minimal size
-FROM gcr.io/distroless/cc-debian12
+# Install runtime dependencies: bash, git, ca-certificates, tini, curl, and build tools for Rust
+RUN apt-get update && apt-get install -y \
+    bash \
+    git \
+    ca-certificates \
+    tini \
+    curl \
+    build-essential \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy CA certificates from builder
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+# Install Rust toolchain
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.85.0
+ENV PATH="/root/.cargo/bin:${PATH}"
 
-# Copy the binary from the builder stage
-COPY --from=builder /app/target/release/rustbot /rustbot
+WORKDIR /app
 
-# Set default environment variables
+# Copy built binary and scripts from builder
+COPY --from=builder /app/target/release/rustbot /app/target/release/rustbot
+COPY --from=builder /app/startup.sh /app/startup.sh
+COPY --from=builder /app/.git /app/.git
+COPY --from=builder /app/Cargo.toml /app/Cargo.toml
+COPY --from=builder /app/Cargo.lock /app/Cargo.lock
+COPY --from=builder /app/src /app/src
+
+# Make sure startup.sh is executable
+RUN chmod +x /app/startup.sh
+
+# Environment defaults (can be overridden)
 ENV RUST_LOG=info
 ENV RUST_BACKTRACE=1
+ENV GIT_BRANCH=develop
 
-# Run the bot
-CMD ["/rustbot"]
+# Use tini for proper signal handling, run startup.sh
+ENTRYPOINT ["/usr/bin/tini", "--", "/app/startup.sh"]

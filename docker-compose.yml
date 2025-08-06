@@ -3,7 +3,7 @@ version: "3.8"
 services:
   rustbot:
     # Use published multi-platform image from Docker Hub
-    image: deekahy/rustbot:latest
+    image: deekahy/rustbot:selfupdate
 
     container_name: rustbot
     restart: unless-stopped
@@ -13,6 +13,8 @@ services:
       - DISCORD_TOKEN=${DISCORD_TOKEN:-}
       - RUST_LOG=${RUST_LOG:-info}
       - RUST_BACKTRACE=${RUST_BACKTRACE:-1}
+      - PROTECTED_USERS=${PROTECTED_USERS:-deekahy}
+      - GIT_BRANCH=${GIT_BRANCH:-developing}
 
     # Resource limits (recommended for production)
     deploy:
