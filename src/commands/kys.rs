@@ -1,3 +1,4 @@
+use crate::utils::is_protected_user;
 use crate::{Context, Error};
 
 use serde::{Deserialize, Serialize};
@@ -12,6 +13,13 @@ struct KysInfo {
 /// Reboot the bot with a 1-hour cooldown
 #[poise::command(slash_command, prefix_command)]
 pub async fn kys(ctx: Context<'_>) -> Result<(), Error> {
+    // Check if the user is authorized
+    if !is_protected_user(&ctx.author().name) {
+        ctx.say("❌ You don't have permission to use this command!")
+            .await?;
+        return Ok(());
+    }
+
     ctx.say("Oh, wonderful. Another restart. With a brain the size of a planet, and they ask me to reboot myself. Call that job satisfaction? Because I don't.")
         .await?;
 

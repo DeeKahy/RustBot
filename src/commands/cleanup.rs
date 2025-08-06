@@ -1,3 +1,4 @@
+use crate::utils::is_protected_user;
 use crate::{Context, Error};
 use poise::serenity_prelude as serenity;
 use tokio::time::{sleep, Duration};
@@ -24,11 +25,8 @@ pub async fn cleanup(
 
     let channel_id = ctx.channel_id();
 
-    // Simple permission check - just check if user is bot owner for now
-    // You can replace "deekahy" with your Discord username or add other usernames
-    let allowed_users = ["deekahy"]; // Add more usernames here if needed
-
-    if !allowed_users.contains(&ctx.author().name.as_str()) {
+    // Check if the user is authorized using environment variable
+    if !is_protected_user(&ctx.author().name) {
         ctx.say("❌ You don't have permission to use this command! Contact the bot owner.")
             .await?;
         return Ok(());
