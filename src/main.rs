@@ -28,7 +28,7 @@ struct KysInfo {
     user_name: String,
 }
 
-// User data, which is stored and accessible in all command invocations
+// User data, which is stored and accessible in all command invocations.
 pub struct Data {}
 
 async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
