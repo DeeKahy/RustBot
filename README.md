@@ -71,6 +71,8 @@ docker run -d \
   --restart unless-stopped \
   -e DISCORD_TOKEN=your_discord_token_here \
   -e RUST_LOG=info \
+  -e GIT_BRANCH=main \
+  -e PROTECTED_USERS="deekahy lardum" \
   --memory=256m \
   --cpus=0.5 \
   deekahy/rustbot:latest
@@ -202,6 +204,8 @@ docker-compose up -d
 
 - `DISCORD_TOKEN` - Your Discord bot token (required)
 - `RUST_LOG` - Log level (optional, defaults to `info`)
+- `GIT_BRANCH` - Git branch to pull from during updates (optional, defaults to `main`)
+- `PROTECTED_USERS` - Space-separated list of usernames who can use protected commands like `-update`, `-cleanup`, and `-kys` (optional, defaults to `deekahy`)
 
 ### Pulling from Docker Hub
 
@@ -293,6 +297,8 @@ RustBot/
 
 - `DISCORD_TOKEN` - Your Discord bot token (required)
 - `RUST_LOG` - Log level (optional, defaults to `info`)
+- `GIT_BRANCH` - Git branch to pull from during updates (optional, defaults to `main`)
+- `PROTECTED_USERS` - Space-separated list of usernames who can use protected commands like `-update`, `-cleanup`, and `-kys` (optional, defaults to `deekahy`)
 
 ## Example Usage
 

@@ -1,3 +1,4 @@
+use crate::utils::{get_git_branch, is_protected_user};
 use crate::{Context, Error};
 
 use serde::{Deserialize, Serialize};
@@ -14,7 +15,7 @@ struct UpdateInfo {
 #[poise::command(slash_command, prefix_command)]
 pub async fn update(ctx: Context<'_>) -> Result<(), Error> {
     // Check if the user is authorized
-    if ctx.author().name != "deekahy" {
+    if !is_protected_user(&ctx.author().name) {
         ctx.say("❌ You don't have permission to use this command!")
             .await?;
         return Ok(());
@@ -26,8 +27,9 @@ pub async fn update(ctx: Context<'_>) -> Result<(), Error> {
     let reply = ctx.say("📥 Pulling latest changes from GitHub...").await?;
 
     // Pull the latest changes
+    let branch = get_git_branch();
     let git_pull = Command::new("git")
-        .args(["pull", "origin", "main"])
+        .args(["pull", "origin", &branch])
         .current_dir("/app")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

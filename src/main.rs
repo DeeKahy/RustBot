@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use serenity::{ChannelId, Client, GatewayIntents};
 
 mod commands;
+mod utils;
 
 use commands::{
     cleanup, coinflip, hello, help, kys, pfp, ping, poll, react, remind, spamping,
