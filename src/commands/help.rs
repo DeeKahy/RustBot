@@ -51,7 +51,7 @@ async fn show_general_help(ctx: Context<'_>) -> Result<(), Error> {
         )
         .field(
             "📊 Utility Commands",
-            "• `-stats [count] [channel]` - Analyze message statistics in a channel\n• `-poll <question? option1 option2...>` - Create a poll with reactions\n• `-react <text>` - Add emoji reactions to a replied message\n• `-remind <time> <message>` - Set a reminder for the future",
+            "• `-stats [count] [channel]` - Analyze message statistics in a channel\n• `-poll <question? option1 option2...>` - Create a poll with reactions\n• `-react <text>` - Add emoji reactions (reply to message or use /react with message ID)\n• `-remind <time> <message>` - Set a reminder for the future",
             false
         )
         .field(
@@ -173,10 +173,17 @@ async fn show_command_help(ctx: Context<'_>, command_name: &str) -> Result<(), E
         },
         "react" => CommandInfo {
             name: "react",
-            description: "Add emoji reactions to a replied message, spelling out the provided text",
-            usage: "`-react <text>` (reply to a message)",
-            examples: vec!["-react lol", "-react cool", "-react 123"],
-            parameters: vec!["text - The text to spell out with emoji reactions"],
+            description: "Add emoji reactions to a message, spelling out the provided text",
+            usage: "`-react <text>` (reply to message) or `/react <text> <message_id>`",
+            examples: vec![
+                "-react lol",
+                "-react cool",
+                "/react wow 1234567890123456789",
+            ],
+            parameters: vec![
+                "text - The text to spell out with emoji reactions",
+                "message_id (slash only) - Discord message ID to react to",
+            ],
         },
         "remind" => CommandInfo {
             name: "remind",

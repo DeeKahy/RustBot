@@ -7,9 +7,8 @@ use std::collections::HashMap;
 #[poise::command(prefix_command, slash_command)]
 pub async fn react(
     ctx: Context<'_>,
-    #[description = "Text to react with (e.g., 'lol', 'cool')"]
-    #[rest]
-    text: String,
+    #[description = "Text to react with (e.g., 'lol', 'cool')"] text: String,
+    #[description = "Message ID to react to (for slash commands)"] message_id: Option<String>,
 ) -> Result<(), Error> {
     log::info!(
         "React command called by {} with text: '{}'",
@@ -23,7 +22,7 @@ pub async fn react(
         return Ok(());
     }
 
-    // Check if this is a reply to a message
+    // Get the message to react to
     let replied_message = match ctx {
         poise::Context::Prefix(prefix_ctx) => {
             if let Some(referenced_msg) = &prefix_ctx.msg.referenced_message {
@@ -35,9 +34,23 @@ pub async fn react(
             }
         }
         poise::Context::Application(_) => {
-            ctx.say("❌ This command only works with prefix commands (use `-react` instead of `/react`)")
-                .await?;
-            return Ok(());
+            // For slash commands, require message_id parameter
+            let msg_id_str = message_id.ok_or_else(|| {
+                "❌ For slash commands, please provide the message ID to react to!"
+            })?;
+
+            let msg_id = msg_id_str.parse::<u64>().map_err(|_| {
+                "❌ Invalid message ID format! Please provide a valid Discord message ID."
+            })?;
+
+            match ctx.channel_id().message(&ctx.http(), msg_id).await {
+                Ok(msg) => msg,
+                Err(_) => {
+                    ctx.say("❌ Could not find a message with that ID in this channel!")
+                        .await?;
+                    return Ok(());
+                }
+            }
         }
     };
 
