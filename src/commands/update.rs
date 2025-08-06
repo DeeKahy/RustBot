@@ -27,7 +27,7 @@ pub async fn update(ctx: Context<'_>) -> Result<(), Error> {
 
     // Pull the latest changes
     let git_pull = Command::new("git")
-        .args(&["pull", "origin", "main"])
+        .args(["pull", "origin", "main"])
         .current_dir("/app")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -50,7 +50,7 @@ pub async fn update(ctx: Context<'_>) -> Result<(), Error> {
 
                 // Build the new version
                 let cargo_build = Command::new("cargo")
-                    .args(&["build", "--release"])
+                    .args(["build", "--release"])
                     .current_dir("/app")
                     .stdout(Stdio::piped())
                     .stderr(Stdio::piped())
@@ -89,7 +89,7 @@ pub async fn update(ctx: Context<'_>) -> Result<(), Error> {
                             reply
                                 .edit(
                                     ctx,
-                                    poise::CreateReply::default().content(&format!(
+                                    poise::CreateReply::default().content(format!(
                                         "❌ Build failed:\n```\n{}\n```",
                                         stderr.chars().take(1900).collect::<String>()
                                     )),
@@ -103,7 +103,7 @@ pub async fn update(ctx: Context<'_>) -> Result<(), Error> {
                             .edit(
                                 ctx,
                                 poise::CreateReply::default()
-                                    .content(&format!("❌ Failed to run cargo build: {}", e)),
+                                    .content(format!("❌ Failed to run cargo build: {}", e)),
                             )
                             .await?;
                     }
@@ -114,7 +114,7 @@ pub async fn update(ctx: Context<'_>) -> Result<(), Error> {
                 reply
                     .edit(
                         ctx,
-                        poise::CreateReply::default().content(&format!(
+                        poise::CreateReply::default().content(format!(
                             "❌ Git pull failed:\n```\n{}\n```",
                             stderr.chars().take(1900).collect::<String>()
                         )),
@@ -128,7 +128,7 @@ pub async fn update(ctx: Context<'_>) -> Result<(), Error> {
                 .edit(
                     ctx,
                     poise::CreateReply::default()
-                        .content(&format!("❌ Failed to run git pull: {}", e)),
+                        .content(format!("❌ Failed to run git pull: {}", e)),
                 )
                 .await?;
         }

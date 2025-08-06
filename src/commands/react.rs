@@ -35,9 +35,8 @@ pub async fn react(
         }
         poise::Context::Application(_) => {
             // For slash commands, require message_id parameter
-            let msg_id_str = message_id.ok_or_else(|| {
-                "❌ For slash commands, please provide the message ID to react to!"
-            })?;
+            let msg_id_str = message_id
+                .ok_or("❌ For slash commands, please provide the message ID to react to!")?;
 
             let msg_id = msg_id_str.parse::<u64>().map_err(|_| {
                 "❌ Invalid message ID format! Please provide a valid Discord message ID."

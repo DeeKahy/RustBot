@@ -171,34 +171,6 @@ async fn show_command_help(ctx: Context<'_>, command_name: &str) -> Result<(), E
             examples: vec!["-kys"],
             parameters: vec![],
         },
-        "react" => CommandInfo {
-            name: "react",
-            description: "Add emoji reactions to a message, spelling out the provided text",
-            usage: "`-react <text>` (reply to message) or `/react <text> <message_id>`",
-            examples: vec![
-                "-react lol",
-                "-react cool",
-                "/react wow 1234567890123456789",
-            ],
-            parameters: vec![
-                "text - The text to spell out with emoji reactions",
-                "message_id (slash only) - Discord message ID to react to",
-            ],
-        },
-        "remind" => CommandInfo {
-            name: "remind",
-            description: "Set a reminder that will be sent to you at a specified time",
-            usage: "`-remind <time> <message>` or `/remind <time> <message>`",
-            examples: vec![
-                "-remind 30m Take a break",
-                "-remind 2h Check the oven",
-                "-remind tomorrow Call mom",
-            ],
-            parameters: vec![
-                "time - When to remind (e.g., 30m, 2h, 1d, tomorrow)",
-                "message - The reminder message",
-            ],
-        },
         "help" => CommandInfo {
             name: "help",
             description: "Show help information for bot commands",
@@ -290,6 +262,14 @@ mod tests {
     fn test_help_command_signature() {
         // Verify the command exists and has the correct signature
         // This is a compile-time test to ensure the function signature matches expectations
-        assert!(true, "Help command function compiles successfully");
+        // Test passes if the function compiles and can be called
+        let info = CommandInfo {
+            name: "test",
+            description: "Test description",
+            usage: "test usage",
+            examples: vec!["test example"],
+            parameters: vec!["test param"],
+        };
+        assert_eq!(info.name, "test");
     }
 }

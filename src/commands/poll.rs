@@ -79,15 +79,15 @@ pub async fn poll(
 
     // Add reactions for each option
     let message = reply.message().await?;
-    for i in 0..options.len().min(reaction_emojis.len()) {
+    for emoji in reaction_emojis
+        .iter()
+        .take(options.len().min(reaction_emojis.len()))
+    {
         if let Err(e) = message
-            .react(
-                &ctx.http(),
-                ReactionType::Unicode(reaction_emojis[i].to_string()),
-            )
+            .react(&ctx.http(), ReactionType::Unicode(emoji.to_string()))
             .await
         {
-            log::warn!("Failed to add reaction {}: {}", reaction_emojis[i], e);
+            log::warn!("Failed to add reaction {}: {}", emoji, e);
         }
     }
 
@@ -97,7 +97,6 @@ pub async fn poll(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn test_poll_parsing() {
@@ -107,7 +106,7 @@ mod tests {
         assert_eq!(parts.len(), 2);
         assert_eq!(parts[0].trim(), "Is this cool");
 
-        let options: Vec<&str> = parts[1].trim().split_whitespace().collect();
+        let options: Vec<&str> = parts[1].split_whitespace().collect();
         assert_eq!(options, vec!["yes", "no", "maybe"]);
     }
 
@@ -125,7 +124,7 @@ mod tests {
         let parts: Vec<&str> = input.splitn(2, '?').collect();
 
         assert_eq!(parts.len(), 2);
-        let options: Vec<&str> = parts[1].trim().split_whitespace().collect();
+        let options: Vec<&str> = parts[1].split_whitespace().collect();
         assert!(options.is_empty());
     }
 
@@ -133,7 +132,7 @@ mod tests {
     fn test_poll_max_options() {
         let input = "Test? 1 2 3 4 5 6 7 8 9 10 11";
         let parts: Vec<&str> = input.splitn(2, '?').collect();
-        let options: Vec<&str> = parts[1].trim().split_whitespace().collect();
+        let options: Vec<&str> = parts[1].split_whitespace().collect();
 
         assert_eq!(options.len(), 11);
         assert!(options.len() > 10);

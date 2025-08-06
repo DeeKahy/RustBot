@@ -19,7 +19,7 @@ fn uwuify(text: &str) -> String {
 
     // Add uwu expressions
     let uwu_expressions = [" uwu ", " owo ", " >w< ", " ^w^ ", " (>ω<) "];
-    let sentences: Vec<&str> = result.split(|c| c == '.' || c == '!' || c == '?').collect();
+    let sentences: Vec<&str> = result.split(['.', '!', '?']).collect();
     let mut uwu_sentences = Vec::new();
 
     for (i, sentence) in sentences.iter().enumerate() {
@@ -165,6 +165,6 @@ mod tests {
         let result = uwuify(input);
 
         // Should preserve some capitalization structure
-        assert!(result.len() > 0);
+        assert!(!result.is_empty());
     }
 }

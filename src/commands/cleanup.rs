@@ -16,7 +16,7 @@ pub async fn cleanup(
     );
 
     // Check if we're in a guild (server) and not in DMs
-    let Some(guild_id) = ctx.guild_id() else {
+    let Some(_guild_id) = ctx.guild_id() else {
         ctx.say("❌ This command can only be used in servers, not in DMs!")
             .await?;
         return Ok(());
