@@ -56,7 +56,7 @@ async fn show_general_help(ctx: Context<'_>) -> Result<(), Error> {
         )
         .field(
             "🛠️ Moderation Commands",
-            "• `-cleanup [count|after]` - Delete messages (admin only)\n• `-update` - Update bot from GitHub (owner only)\n• `-kys` - Reboot bot with 1-hour cooldown (admin only)",
+            "• `-cleanup [count|after]` - Delete messages (admin only)\n• `-update` - Update bot from GitHub (owner only)\n• `-kys` - Reboot bot with 1-hour cooldown",
             false
         )
         .field(
@@ -166,7 +166,7 @@ async fn show_command_help(ctx: Context<'_>, command_name: &str) -> Result<(), E
         },
         "kys" => CommandInfo {
             name: "kys",
-            description: "Reboot the bot with a 1-hour cooldown (admin only)",
+            description: "Reboot the bot with a 1-hour cooldown",
             usage: "`-kys` or `/kys`",
             examples: vec!["-kys"],
             parameters: vec![],

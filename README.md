@@ -29,7 +29,7 @@ A modern Discord bot built with Rust using the Serenity library and Poise comman
 - `-coinflip` - Flip a coin (heads or tails)
 - `-pfp [user]` - Get user's profile picture
 - `-yourmom` - Shows a random server member's profile picture
-- `-kys` - Reboot bot with 1-hour cooldown (admin only)
+- `-kys` - Reboot bot with 1-hour cooldown
 
 ## Quick Start with Docker (Recommended)
 
