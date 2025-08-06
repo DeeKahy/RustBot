@@ -6,34 +6,17 @@ use tokio::time::{sleep, Duration};
 #[poise::command(prefix_command, slash_command)]
 pub async fn cleanup(
     ctx: Context<'_>,
-    #[description = "Number of messages to delete"] count: Option<u64>,
-    #[description = "Delete all messages after the replied message"] after: Option<bool>,
+    #[description = "Number of messages to delete OR 'after' to delete after replied message"]
+    count_or_after: Option<String>,
 ) -> Result<(), Error> {
     log::info!(
-        "Cleanup command called by {} with count: {:?}, after: {:?}",
+        "Cleanup command called by {} with argument: {:?}",
         ctx.author().name,
-        count,
-        after
+        count_or_after
     );
 
-    // Check if user has manage messages permission
-    let permissions = ctx.author_permissions().await;
-    match permissions {
-        Ok(perms) if !perms.manage_messages() => {
-            ctx.say("❌ You don't have permission to delete messages! You need the 'Manage Messages' permission.")
-                .await?;
-            return Ok(());
-        }
-        Err(_) => {
-            ctx.say("❌ Could not check your permissions. Make sure this command is used in a server channel.")
-                .await?;
-            return Ok(());
-        }
-        _ => {}
-    }
-
     // Check if we're in a guild (server) and not in DMs
-    let Some(_guild_id) = ctx.guild_id() else {
+    let Some(guild_id) = ctx.guild_id() else {
         ctx.say("❌ This command can only be used in servers, not in DMs!")
             .await?;
         return Ok(());
@@ -41,15 +24,41 @@ pub async fn cleanup(
 
     let channel_id = ctx.channel_id();
 
+    // Simple permission check - just check if user is bot owner for now
+    // You can replace "deekahy" with your Discord username or add other usernames
+    let allowed_users = ["deekahy"]; // Add more usernames here if needed
+
+    if !allowed_users.contains(&ctx.author().name.as_str()) {
+        ctx.say("❌ You don't have permission to use this command! Contact the bot owner.")
+            .await?;
+        return Ok(());
+    }
+
+    // Check if this is "after" mode or count mode
+    let is_after_mode = count_or_after
+        .as_ref()
+        .map(|s| s.to_lowercase() == "after")
+        .unwrap_or(false);
+
     // Handle "after" mode - delete messages after the replied message
-    if after.unwrap_or(false) {
-        let Some(replied_msg) = ctx.msg().referenced_message.as_ref() else {
+    if is_after_mode {
+        // Try to get the replied message from prefix context
+        let replied_msg_id = match ctx {
+            poise::Context::Prefix(prefix_ctx) => {
+                prefix_ctx.msg.referenced_message.as_ref().map(|msg| msg.id)
+            }
+            poise::Context::Application(_) => {
+                ctx.say("❌ The 'after' option only works with prefix commands (starting with -)! Please reply to a message and use `-cleanup after true`")
+                    .await?;
+                return Ok(());
+            }
+        };
+
+        let Some(after_id) = replied_msg_id else {
             ctx.say("❌ You must reply to a message when using the `after` option!")
                 .await?;
             return Ok(());
         };
-
-        let after_id = replied_msg.id;
 
         ctx.say("🧹 Starting cleanup after the specified message... This may take a while to avoid rate limits.")
             .await?;
@@ -153,7 +162,16 @@ pub async fn cleanup(
     }
 
     // Handle count mode - delete the last X messages
-    let delete_count = count.unwrap_or(10);
+    let delete_count = if let Some(arg) = count_or_after {
+        if arg.to_lowercase() == "after" {
+            // This shouldn't happen as we handle "after" mode above, but just in case
+            10
+        } else {
+            arg.parse::<u64>().unwrap_or(10)
+        }
+    } else {
+        10
+    };
 
     if delete_count == 0 {
         ctx.say("❌ Count must be greater than 0!").await?;
@@ -200,6 +218,7 @@ pub async fn cleanup(
 
         // Collect message IDs
         let message_ids: Vec<serenity::MessageId> = messages.iter().map(|msg| msg.id).collect();
+        let message_count = message_ids.len();
 
         if message_ids.len() == 1 {
             // Single message deletion
@@ -219,9 +238,9 @@ pub async fn cleanup(
             {
                 log::warn!("Failed to bulk delete messages: {}", e);
                 // Try individual deletion as fallback
-                for msg_id in message_ids {
+                for msg_id in &message_ids {
                     if let Err(e) = channel_id
-                        .delete_message(&ctx.serenity_context().http, msg_id)
+                        .delete_message(&ctx.serenity_context().http, *msg_id)
                         .await
                     {
                         log::warn!("Failed to delete message {} individually: {}", msg_id, e);
@@ -232,11 +251,11 @@ pub async fn cleanup(
                     sleep(Duration::from_millis(100)).await;
                 }
             } else {
-                deleted_count += message_ids.len() as u64;
+                deleted_count += message_count as u64;
             }
         }
 
-        remaining = remaining.saturating_sub(message_ids.len() as u64);
+        remaining = remaining.saturating_sub(message_count as u64);
 
         // Rate limit protection - wait between batches
         sleep(Duration::from_millis(1000)).await; // 1 second delay to be safe
