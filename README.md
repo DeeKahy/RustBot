@@ -12,6 +12,7 @@ A modern Discord bot built with Rust using the Serenity library and Poise comman
 - 🪙 **Coin Flip**: Random coin flip command
 - 👤 **Profile Picture**: Get user's profile picture
 - 🎲 **Your Mom**: Displays a random server member's profile picture with a funny message
+- ⏰ **Reminder System**: Set personal reminders with flexible time formats
 - 🔧 **Modular Design**: Easy to add new commands and features
 - 📝 **Logging**: Built-in logging system for debugging and monitoring
 - ⚡ **Async**: Built with Tokio for high performance
@@ -30,6 +31,10 @@ A modern Discord bot built with Rust using the Serenity library and Poise comman
 - `-pfp [user]` - Get user's profile picture
 - `-yourmom` - Shows a random server member's profile picture
 - `-kys` - Reboot bot with 1-hour cooldown
+- `-remind set <time> <message>` - Set a reminder (e.g., `5m`, `1h`, `2d`)
+- `-remind list` - List your active reminders
+- `-remind remove <id>` - Remove a specific reminder
+- `-remind clear` - Clear all your reminders
 
 ## Quick Start with Docker (Recommended)
 
@@ -333,6 +338,40 @@ Bot: [Embed with title "Your mom is RandomUser123!" showing RandomUser123's prof
 
 User: /yourmom
 Bot: [Same embed but triggered via slash command]
+
+User: !remind set 30m Take out the trash
+Bot: ⏰ Reminder Set!
+     Message: Take out the trash
+     Remind at: Today at 3:45 PM
+     Reminder ID: 1
+
+User: /remind list
+Bot: 📋 Your Active Reminders
+     ID 1: Take out the trash
+     ⏰ in 25 minutes
+     
+     Total active reminders: 1
+
+[30 minutes later]
+Bot: ⏰ Reminder!
+     Take out the trash
+     
+     @YourUsername
+     Set 30 minutes ago
+
+User: !remind set 2h Call mom
+Bot: ⏰ Reminder Set!
+     Message: Call mom
+     Remind at: Today at 5:30 PM
+     Reminder ID: 2
+
+User: /remind remove 2
+Bot: 🗑️ Reminder Removed
+     Removed: Call mom
+
+User: !remind clear
+Bot: 🧹 Reminders Cleared
+     Removed 1 reminder(s)
 ```
 
 ## SpamPing Command Details
@@ -359,6 +398,44 @@ The `spamping` command has several built-in safety features and escalating inten
 4. Monitors thread for any messages from the target user
 5. Stops when user responds or after 50 attempts
 ```
+
+## Reminder System Details
+
+The reminder system allows users to set personal reminders that will be delivered back to them at specified times.
+
+### ⏰ **Time Formats Supported**
+- **Seconds**: `30s`, `45sec`, `1second`, `5seconds`
+- **Minutes**: `5m`, `15min`, `30minute`, `45minutes`
+- **Hours**: `1h`, `2hr`, `8hour`, `12hours`
+- **Days**: `1d`, `3day`, `7days`
+- **Weeks**: `1w`, `2week`, `4weeks`
+
+### 🎯 **Features**
+- **Personal reminders**: Only you can see and manage your reminders
+- **Persistent storage**: Reminders survive bot restarts
+- **Background monitoring**: Automatic delivery when time is reached
+- **Multiple reminders**: Set as many as you need
+- **Easy management**: List, remove, or clear all reminders
+- **Cross-channel delivery**: Reminders are sent where they were originally set
+
+### 📝 **Commands**
+- **`-remind set <time> <message>`**: Set a new reminder
+  - Example: `-remind set 1h30m Meeting with team`
+- **`-remind list`**: Show all your active reminders with IDs and times
+- **`-remind remove <id>`**: Remove a specific reminder by ID
+- **`-remind clear`**: Remove all your reminders at once
+
+### 🔧 **How It Works**
+1. Reminders are stored in JSON format with unique IDs
+2. Background task checks every minute for due reminders
+3. When time arrives, reminder is sent as a mention in the original channel
+4. Delivered reminders are automatically removed from storage
+5. All times are calculated from when the reminder was set
+
+### 💾 **Data Storage**
+- Reminders are stored in `/tmp/rustbot_reminders.json`
+- Each reminder includes: ID, user ID, channel ID, message, remind time, and creation time
+- File persists between bot restarts for reliability
 
 ## Command Types
 

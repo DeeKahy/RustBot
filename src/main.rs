@@ -8,7 +8,8 @@ use serenity::{ChannelId, Client, GatewayIntents};
 mod commands;
 
 use commands::{
-    cleanup, coinflip, hello, help, kys, pfp, ping, poll, spamping, stats, update, uwu, yourmom,
+    cleanup, coinflip, hello, help, kys, pfp, ping, poll, remind, spamping, start_reminder_checker,
+    stats, update, uwu, yourmom,
 };
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -78,6 +79,7 @@ async fn main() {
                 kys(),
                 poll(),
                 cleanup(),
+                remind(),
             ],
             prefix_options: poise::PrefixFrameworkOptions {
                 prefix: Some("-".into()),
@@ -187,6 +189,11 @@ async fn main() {
 
                 poise::builtins::register_globally(ctx, commands).await?;
                 log::info!("All commands registered successfully");
+
+                // Start reminder checker background task
+                start_reminder_checker(ctx.http.clone());
+                log::info!("Reminder checker started");
+
                 Ok(Data {})
             })
         })
