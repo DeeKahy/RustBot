@@ -31,7 +31,7 @@ pub async fn help(
 
 async fn show_general_help(ctx: Context<'_>) -> Result<(), Error> {
     let embed = serenity::CreateEmbed::new()
-        .title("🤖 Bot Help - Available Commands")
+        .title("🤖 Bot Help - Available Commaiiiiiiiiiinds")
         .description("Here are all the available commands you can use with this bot!\n\nUse `-help <command>` for detailed information about a specific command.")
         .color(0x7289DA)
         .field(
