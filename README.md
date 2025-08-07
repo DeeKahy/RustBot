@@ -46,22 +46,7 @@ A modern Discord bot built with Rust using the Serenity library and Poise comman
 1. Add new application in CasaOS
 2. Use image: `deekahy/rustbot:latest`
 3. Set environment variable: `DISCORD_TOKEN=your_discord_bot_token`
-4. Set memory limit: `256m` and CPU limit: `0.5`
-5. Start the container
-
-**Platforms Supported**: Linux AMD64, Linux ARM64 (Raspberry Pi 4+)
-
-### Option 2: Docker Compose
-
-```bash
-# Quick start
-DISCORD_TOKEN=your_token docker-compose -f docker-compose.casaos.yml up -d
-
-# Or copy and edit the compose file
-cp docker-compose.casaos.yml docker-compose.yml
-# Edit docker-compose.yml to set your DISCORD_TOKEN
-docker-compose up -d
-```
+4. Start the container
 
 ### Option 3: Direct Docker Run
 

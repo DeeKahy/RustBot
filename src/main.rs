@@ -9,7 +9,7 @@ mod commands;
 mod utils;
 
 use commands::{
-    cleanup, coinflip, hello, help, kys, pfp, ping, poll, react, remind, spamping,
+    cleanup, coinflip, hello, help, invite, kys, pfp, ping, poll, react, remind, spamping,
     start_reminder_checker, stats, update, uwu, yourmom,
 };
 
@@ -70,6 +70,7 @@ async fn main() {
                 ping(),
                 hello(),
                 help(),
+                invite(),
                 spamping(),
                 uwu(),
                 coinflip(),
