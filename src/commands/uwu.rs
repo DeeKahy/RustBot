@@ -77,6 +77,10 @@ pub async fn uwu(
         match ctx {
             poise::Context::Prefix(prefix_ctx) => {
                 if let Some(replied_message) = prefix_ctx.msg.referenced_message.as_ref() {
+                    // Delete the invoker's message when replying to another message
+                    if let Err(e) = prefix_ctx.msg.delete(&ctx.http()).await {
+                        log::warn!("Failed to delete invoker's message: {}", e);
+                    }
                     (replied_message.content.clone(), true)
                 } else {
                     ctx.say(
