@@ -30,7 +30,7 @@ pub async fn update(ctx: Context<'_>) -> Result<(), Error> {
     let branch = get_git_branch();
     let git_reset = Command::new("git")
         .args(["reset", "--hard", &format!("origin/{branch}")])
-        .current_dir("/app")
+        .current_dir("/app/RustBot")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output();
@@ -50,7 +50,7 @@ pub async fn update(ctx: Context<'_>) -> Result<(), Error> {
     // Pull the latest changes
     let git_pull = Command::new("git")
         .args(["pull", "origin", &branch])
-        .current_dir("/app")
+        .current_dir("/app/RustBot")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output();
@@ -73,7 +73,7 @@ pub async fn update(ctx: Context<'_>) -> Result<(), Error> {
                 // Build the new version
                 let cargo_build = Command::new("cargo")
                     .args(["build", "--release"])
-                    .current_dir("/app")
+                    .current_dir("/app/RustBot")
                     .stdout(Stdio::piped())
                     .stderr(Stdio::piped())
                     .output();
