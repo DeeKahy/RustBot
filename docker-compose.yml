@@ -2,8 +2,8 @@ version: "3.8"
 
 services:
   rustbot:
-    # Use published multi-platform image from Docker Hub
-    image: deekahy/rustbot:selfupdate
+    # Use lightweight GitHub-cloning image
+    image: ghcr.io/deekahy/rustbot:latest
 
     container_name: rustbot
     restart: unless-stopped
@@ -16,15 +16,15 @@ services:
       - PROTECTED_USERS=${PROTECTED_USERS:-deekahy}
       - GIT_BRANCH=${GIT_BRANCH:-developing}
 
-    # Resource limits (recommended for production)
+    # Resource limits (higher for compilation)
     deploy:
       resources:
         limits:
-          memory: 256M
-          cpus: "0.5"
+          memory: 1G
+          cpus: "1.0"
         reservations:
-          memory: 128M
-          cpus: "0.1"
+          memory: 512M
+          cpus: "0.2"
 
     # Health check to monitor bot status
     healthcheck:

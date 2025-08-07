@@ -1,8 +1,8 @@
-# Rust build artifacts
+# Build artifacts (not needed since we build from source)
 target/
 
-# Git files (keep .git for auto-update functionality)
-# .git/
+# Git files (not needed since we clone fresh)
+.git/
 .gitignore
 .gitattributes
 
@@ -11,7 +11,7 @@ README.md
 LICENSE
 *.md
 
-# Environment files
+# Environment files (sensitive data)
 .env
 .env.local
 .env.example
@@ -27,9 +27,9 @@ LICENSE
 .DS_Store
 Thumbs.db
 
-# Docker files (keep for potential multi-stage builds)
-# Dockerfile
-# .dockerignore
+# Docker files
+Dockerfile.*
+docker-compose*.yml
 
 # Logs
 *.log
@@ -38,5 +38,10 @@ Thumbs.db
 tmp/
 temp/
 
-# Local startup script (Docker has its own embedded version)
-# startup.sh
+# Source code (not needed since we clone from GitHub)
+src/
+Cargo.toml
+Cargo.lock
+
+# Deploy scripts (not needed in container)
+deploy.sh

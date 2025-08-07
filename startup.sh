@@ -1,35 +1,43 @@
 #!/bin/bash
 set -e
 
-echo "🔄 Checking for updates from GitHub..."
+echo "🤖 RustBot GitHub-based Container Starting..."
 
-# Configure git to trust the directory
-git config --global --add safe.directory /app 2>/dev/null || git config --global --add safe.directory $(pwd)
+# Clone repo on first run, pull updates on subsequent runs
+if [ ! -d "/app/RustBot" ]; then
+    echo "🔄 First startup - cloning repository from GitHub..."
+    git clone -b "${GIT_BRANCH:-developing}" "${REPO_URL:-https://github.com/DeeKahy/RustBot.git}" /app/RustBot
+    cd /app/RustBot
+    echo "🔨 Building application (this may take a few minutes)..."
+    cargo build --release
+    echo "✅ Build complete!"
+else
+    echo "🔄 Checking for updates from GitHub..."
+    cd /app/RustBot
 
-# Pull latest changes
-if git pull origin developing; then
-    echo "✅ Successfully pulled latest changes"
+    # Configure git to trust the directory
+    git config --global --add safe.directory /app/RustBot 2>/dev/null || true
 
-    # Check if there are any changes to source files
-    if git diff --name-only HEAD@{1} HEAD | grep -E '\.(rs|toml)$' > /dev/null 2>&1; then
-        echo "🔨 Source code changes detected, rebuilding..."
+    # Pull latest changes
+    if git pull origin "${GIT_BRANCH:-developing}"; then
+        echo "✅ Successfully pulled latest changes"
+        echo "🔨 Rebuilding application..."
         if cargo build --release; then
             echo "✅ Build successful!"
         else
             echo "❌ Build failed, using previous version"
         fi
     else
-        echo "ℹ️ No source code changes detected, using existing build"
+        echo "⚠️ Failed to pull updates, using existing version"
     fi
-else
-    echo "⚠️ Failed to pull updates, using existing version"
 fi
 
 echo "🚀 Starting RustBot..."
+cd /app/RustBot
 
-# Start the bot with restart capability
+# Start the bot with restart capability for -kys and -update commands
 while true; do
-    ./target/release/rustbot 2>/dev/null || cargo run
+    ./target/release/rustbot
     exit_code=$?
 
     # Exit code 42 means update was requested
@@ -37,19 +45,13 @@ while true; do
         echo "🔄 Update requested, pulling latest changes..."
 
         # Pull latest changes
-        if git pull origin developing; then
+        if git pull origin "${GIT_BRANCH:-developing}"; then
             echo "✅ Successfully pulled latest changes"
-
-            # Rebuild if source files changed
-            if git diff --name-only HEAD@{1} HEAD | grep -E '\.(rs|toml)$' > /dev/null 2>&1; then
-                echo "🔨 Rebuilding with latest changes..."
-                if cargo build --release; then
-                    echo "✅ Build successful, restarting with new version!"
-                else
-                    echo "❌ Build failed, restarting with previous version"
-                fi
+            echo "🔨 Rebuilding with latest changes..."
+            if cargo build --release; then
+                echo "✅ Build successful, restarting with new version!"
             else
-                echo "ℹ️ No source changes, restarting with same version"
+                echo "❌ Build failed, restarting with previous version"
             fi
         else
             echo "⚠️ Failed to pull updates, restarting with current version"
@@ -57,6 +59,7 @@ while true; do
 
         sleep 2
         continue
+
     # Exit code 43 means kys command was used (1-hour cooldown)
     elif [ $exit_code -eq 43 ]; then
         echo "💤 KYS command used, sleeping for 1 hour before restart..."
