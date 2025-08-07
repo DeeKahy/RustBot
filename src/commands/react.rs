@@ -22,6 +22,13 @@ pub async fn react(
         return Ok(());
     }
 
+    // Delete the invoker's message if it's a prefix command
+    if let poise::Context::Prefix(prefix_ctx) = &ctx {
+        if let Err(e) = prefix_ctx.msg.delete(&ctx.http()).await {
+            log::warn!("Failed to delete invoker's message: {}", e);
+        }
+    }
+
     // Get the message to react to
     let replied_message = match ctx {
         poise::Context::Prefix(prefix_ctx) => {
@@ -98,12 +105,14 @@ pub async fn react(
         }
     }
 
-    if reactions_added > 0 {
-        ctx.say(format!("✅ Added {reactions_added} reactions!"))
+    // Only send error messages for slash commands or if no reactions were added
+    if reactions_added == 0 {
+        if let poise::Context::Application(_) = &ctx {
+            ctx.say(
+                "❌ Couldn't add any reactions. The emojis might already be used or unavailable.",
+            )
             .await?;
-    } else {
-        ctx.say("❌ Couldn't add any reactions. The emojis might already be used or unavailable.")
-            .await?;
+        }
     }
 
     log::info!("React command completed. Added {reactions_added} reactions");

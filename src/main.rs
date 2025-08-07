@@ -26,6 +26,7 @@ struct UpdateInfo {
 struct KysInfo {
     channel_id: u64,
     user_name: String,
+    timestamp: u64,
 }
 
 // User data, which is stored and accessible in all command invocations.
@@ -145,36 +146,60 @@ async fn main() {
                 // Check if this is a restart after a kys command (1-hour cooldown)
                 if let Ok(kys_info_str) = fs::read_to_string("/tmp/rustbot_kys_info.json") {
                     if let Ok(kys_info) = serde_json::from_str::<KysInfo>(&kys_info_str) {
-                        let channel_id = ChannelId::new(kys_info.channel_id);
-                        match channel_id
-                            .say(
-                                &ctx.http,
-                                format!(
-                                    "Good morning! {} has awakened from their 1-hour slumber and is back online!",
-                                    _ready.user.name
-                                ),
-                            )
-                            .await
-                        {
-                            Ok(_) => {
-                                log::info!(
-                                    "Successfully sent post-kys startup message to channel {}",
-                                    kys_info.channel_id
-                                );
-                            }
-                            Err(e) => {
-                                log::error!(
-                                    "Failed to send kys startup message to channel {}: {}",
-                                    kys_info.channel_id,
-                                    e
-                                );
-                            }
-                        }
+                        // Verify that at least 1 hour has passed since the kys command
+                        let current_time = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs();
 
-                        // Clean up the kys info file
-                        if let Err(e) = fs::remove_file("/tmp/rustbot_kys_info.json") {
-                            log::warn!("Failed to remove kys info file: {e}");
+                        let time_elapsed = current_time - kys_info.timestamp;
+                        let one_hour = 3600; // seconds
+
+                        if time_elapsed >= one_hour {
+                            let channel_id = ChannelId::new(kys_info.channel_id);
+                            match channel_id
+                                .say(
+                                    &ctx.http,
+                                    format!(
+                                        "Good morning! {} has awakened from their 1-hour slumber and is back online! ⏰ (Waited {} minutes)",
+                                        _ready.user.name,
+                                        time_elapsed / 60
+                                    ),
+                                )
+                                .await
+                            {
+                                Ok(_) => {
+                                    log::info!(
+                                        "Successfully sent post-kys startup message to channel {} after {} seconds",
+                                        kys_info.channel_id,
+                                        time_elapsed
+                                    );
+                                }
+                                Err(e) => {
+                                    log::error!(
+                                        "Failed to send kys startup message to channel {}: {}",
+                                        kys_info.channel_id,
+                                        e
+                                    );
+                                }
+                            }
+
+                            // Clean up the kys info file
+                            if let Err(e) = fs::remove_file("/tmp/rustbot_kys_info.json") {
+                                log::warn!("Failed to remove kys info file: {e}");
+                            }
+                        } else {
+                            // Not enough time has passed, exit again to continue waiting
+                            let remaining_time = one_hour - time_elapsed;
+                            log::warn!(
+                                "Kys cooldown not complete. {} seconds remaining. Exiting again.",
+                                remaining_time
+                            );
+                            std::process::exit(43);
                         }
+                    } else {
+                        log::warn!("Failed to parse kys info JSON, cleaning up file");
+                        let _ = fs::remove_file("/tmp/rustbot_kys_info.json");
                     }
                 }
 
