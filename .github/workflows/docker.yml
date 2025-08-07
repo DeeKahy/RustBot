@@ -1,11 +1,12 @@
 name: Build and Push Docker Image
+name: Docker Build and Push
 
 on:
   push:
-    branches: [main, master]
-    tags: ["v*"]
+    branches: [ "main", "developing" ]
+    tags: [ 'v*.*.*' ]
   pull_request:
-    branches: [main, master]
+    branches: [ "main" ]
 
 env:
   REGISTRY: ghcr.io
@@ -14,8 +15,9 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    # Only run this job after CI tests pass
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.draft == false)
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout repository
@@ -32,7 +34,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
+      - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -45,7 +47,7 @@ jobs:
             type=semver,pattern={{major}}
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push Docker image
+      - name: Build and push lightweight Docker image
         uses: docker/build-push-action@v5
         with:
           context: .

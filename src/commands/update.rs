@@ -26,8 +26,28 @@ pub async fn update(ctx: Context<'_>) -> Result<(), Error> {
     // Create a follow-up message that we can edit
     let reply = ctx.say("📥 Pulling latest changes from GitHub...").await?;
 
-    // Pull the latest changes
+    // Reset any local changes first (handles deleted files)
     let branch = get_git_branch();
+    let git_reset = Command::new("git")
+        .args(["reset", "--hard", &format!("origin/{branch}")])
+        .current_dir("/app")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output();
+
+    match git_reset {
+        Ok(reset_output) => {
+            if !reset_output.status.success() {
+                let stderr = String::from_utf8_lossy(&reset_output.stderr);
+                log::warn!("Git reset had issues but continuing: {stderr}");
+            }
+        }
+        Err(e) => {
+            log::warn!("Failed to run git reset, continuing anyway: {e}");
+        }
+    }
+
+    // Pull the latest changes
     let git_pull = Command::new("git")
         .args(["pull", "origin", &branch])
         .current_dir("/app")
