@@ -2,6 +2,7 @@ use crate::utils::{get_git_branch, is_protected_user};
 use crate::{Context, Error};
 
 use serde::{Deserialize, Serialize};
+use std::env;
 use std::fs;
 use std::process::{Command, Stdio};
 
@@ -9,6 +10,37 @@ use std::process::{Command, Stdio};
 struct UpdateInfo {
     channel_id: u64,
     user_name: String,
+}
+
+fn find_rustbot_directory() -> Option<String> {
+    // First, try to detect if we're running from /app/RustBot (Docker environment)
+    if std::path::Path::new("/app/RustBot/.git").exists() {
+        return Some("/app/RustBot".to_string());
+    }
+
+    // Try to find RustBot directory from current working directory
+    let current_dir = env::current_dir().ok()?;
+
+    // Check if we're already in the RustBot directory
+    if current_dir.join(".git").exists() && current_dir.file_name()?.to_str()? == "RustBot" {
+        return Some(current_dir.to_string_lossy().to_string());
+    }
+
+    // Check if RustBot is a subdirectory of current directory
+    let rustbot_subdir = current_dir.join("RustBot");
+    if rustbot_subdir.join(".git").exists() {
+        return Some(rustbot_subdir.to_string_lossy().to_string());
+    }
+
+    // Check parent directory for RustBot
+    if let Some(parent) = current_dir.parent() {
+        let rustbot_parent = parent.join("RustBot");
+        if rustbot_parent.join(".git").exists() {
+            return Some(rustbot_parent.to_string_lossy().to_string());
+        }
+    }
+
+    None
 }
 
 /// Update the bot by pulling latest changes from GitHub and restarting
@@ -23,6 +55,16 @@ pub async fn update(ctx: Context<'_>) -> Result<(), Error> {
 
     ctx.say("🔄 Starting update process...").await?;
 
+    // Find the correct RustBot directory
+    let rustbot_dir = match find_rustbot_directory() {
+        Some(dir) => dir,
+        None => {
+            ctx.say("❌ Could not find RustBot directory with .git folder!")
+                .await?;
+            return Ok(());
+        }
+    };
+
     // Create a follow-up message that we can edit
     let reply = ctx.say("📥 Pulling latest changes from GitHub...").await?;
 
@@ -30,7 +72,7 @@ pub async fn update(ctx: Context<'_>) -> Result<(), Error> {
     let branch = get_git_branch();
     let git_reset = Command::new("git")
         .args(["reset", "--hard", &format!("origin/{branch}")])
-        .current_dir("/app/RustBot")
+        .current_dir(&rustbot_dir)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output();
@@ -50,7 +92,7 @@ pub async fn update(ctx: Context<'_>) -> Result<(), Error> {
     // Pull the latest changes
     let git_pull = Command::new("git")
         .args(["pull", "origin", &branch])
-        .current_dir("/app/RustBot")
+        .current_dir(&rustbot_dir)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output();
@@ -73,7 +115,7 @@ pub async fn update(ctx: Context<'_>) -> Result<(), Error> {
                 // Build the new version
                 let cargo_build = Command::new("cargo")
                     .args(["build", "--release"])
-                    .current_dir("/app/RustBot")
+                    .current_dir(&rustbot_dir)
                     .stdout(Stdio::piped())
                     .stderr(Stdio::piped())
                     .output();

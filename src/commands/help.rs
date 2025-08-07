@@ -36,7 +36,7 @@ async fn show_general_help(ctx: Context<'_>) -> Result<(), Error> {
         .color(0x7289DA)
         .field(
             "🏓 Basic Commands",
-            "• `-ping` - Check bot latency and responsiveness\n• `-hello` - Get a friendly greeting from the bot\n• `-help` - Show this help message",
+            "• `-ping` - Check bot latency and responsiveness\n• `-hello` - Get a friendly greeting from the bot\n• `-help` - Show this help message\n• `-invite` - Get the bot invite link to add it to your server",
             false
         )
         .field(
@@ -170,6 +170,37 @@ async fn show_command_help(ctx: Context<'_>, command_name: &str) -> Result<(), E
             usage: "`-kys` or `/kys`",
             examples: vec!["-kys"],
             parameters: vec![],
+        },
+        "invite" => CommandInfo {
+            name: "invite",
+            description: "Generate and display the bot's invite link",
+            usage: "`-invite` or `/invite`",
+            examples: vec!["-invite"],
+            parameters: vec![],
+        },
+        "react" => CommandInfo {
+            name: "react",
+            description: "Add emoji reactions to a message",
+            usage: "`-react <text>` (reply to message) or `/react <message_id> <text>`",
+            examples: vec!["-react thumbs up", "-react fire heart"],
+            parameters: vec![
+                "text - The text to convert to emoji reactions",
+                "message_id (slash only) - ID of message to react to",
+            ],
+        },
+        "remind" => CommandInfo {
+            name: "remind",
+            description: "Set a reminder for the future",
+            usage: "`-remind <time> <message>` or `/remind <time> <message>`",
+            examples: vec![
+                "-remind 10m Take a break",
+                "-remind 2h Meeting starts",
+                "-remind 1d Pay bills",
+            ],
+            parameters: vec![
+                "time - Time to wait (e.g., 10m, 2h, 1d)",
+                "message - Reminder message",
+            ],
         },
         "help" => CommandInfo {
             name: "help",
