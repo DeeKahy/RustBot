@@ -45,12 +45,32 @@ pub async fn status(ctx: Context<'_>) -> Result<(), Error> {
     let guild_count = ctx.cache().guilds().len();
     let mut total_users = 0;
     let mut total_channels = 0;
+    let mut cached_member_count = 0;
+    let mut guilds_with_zero_count = 0;
+    let mut _guilds_with_valid_count = 0;
 
+    // Collect stats from cached guilds
     for guild_id in ctx.cache().guilds() {
         if let Some(guild) = ctx.cache().guild(guild_id) {
-            total_users += guild.member_count;
+            // Discord's member_count field is the authoritative count
+            // But it might be 0 if the bot doesn't have the intent or if cache is incomplete
+            if guild.member_count > 0 {
+                total_users += guild.member_count;
+                _guilds_with_valid_count += 1;
+            } else {
+                guilds_with_zero_count += 1;
+                // Fallback to cached members (will be limited without GUILD_MEMBERS intent)
+                cached_member_count += guild.members.len() as u64;
+            }
+
+            // Count all types of channels (text, voice, category, etc.)
             total_channels += guild.channels.len();
         }
+    }
+
+    // If we had to use cached members, add those to the total
+    if cached_member_count > 0 && total_users == 0 {
+        total_users = cached_member_count;
     }
 
     // Get current guild info if available
@@ -109,15 +129,30 @@ pub async fn status(ctx: Context<'_>) -> Result<(), Error> {
         true,
     );
 
-    // Discord statistics
-    embed = embed.field(
-        "📊 Discord Statistics",
+    // Discord statistics with detailed debugging info
+    let stats_text = if total_users == 0 && guild_count > 0 {
         format!(
-            "**Guilds:** {}\n**Total Users:** {}\n**Total Channels:** {}",
+            "**Guilds:** {}\n**Total Users:** {} ⚠️\n**Total Channels:** {}\n**Debug:** {}/{} guilds have member_count=0\n\n*Member counts may be 0 due to cache warming or large guilds*",
+            guild_count, total_users, total_channels, guilds_with_zero_count, guild_count
+        )
+    } else if total_users == cached_member_count && cached_member_count > 0 {
+        format!(
+            "**Guilds:** {}\n**Total Users:** {} (from cache)\n**Total Channels:** {}\n**Debug:** Using cached member data",
             guild_count, total_users, total_channels
-        ),
-        true,
-    );
+        )
+    } else if guilds_with_zero_count > 0 {
+        format!(
+            "**Guilds:** {}\n**Total Users:** {} (partial)\n**Total Channels:** {}\n**Debug:** {}/{} guilds missing counts",
+            guild_count, total_users, total_channels, guilds_with_zero_count, guild_count
+        )
+    } else {
+        format!(
+            "**Guilds:** {}\n**Total Users:** {}\n**Total Channels:** {}\n**Debug:** All counts available",
+            guild_count, total_users, total_channels
+        )
+    };
+
+    embed = embed.field("📊 Discord Statistics", stats_text, true);
 
     // Current guild information
     if let (Some(name), Some(members), Some(roles)) =
@@ -131,7 +166,7 @@ pub async fn status(ctx: Context<'_>) -> Result<(), Error> {
     }
 
     // Bot capabilities and features
-    let capabilities = vec![
+    let capabilities = [
         "✅ Prefix Commands (-command)",
         "✅ Slash Commands (/command)",
         "✅ Message Content Access",
@@ -145,6 +180,11 @@ pub async fn status(ctx: Context<'_>) -> Result<(), Error> {
 
     embed = embed.field("🔧 Bot Capabilities", capabilities.join("\n"), false);
 
+    // Gateway intents information
+    let intents_info = "**Configured Intents:**\n• Guild Messages ✅\n• Direct Messages ✅\n• Message Content ✅\n• Guild Members ✅\n\n*If user counts show 0, the bot may need time to cache member data or guilds may have member count disabled.*";
+
+    embed = embed.field("🔗 Gateway Intents", intents_info, false);
+
     // Version and build information
     let version_info = format!(
         "**Package:** rustbot v{}\n**Rust Edition:** 2021\n**Framework:** Poise + Serenity\n**Build:** Development",
@@ -154,7 +194,7 @@ pub async fn status(ctx: Context<'_>) -> Result<(), Error> {
     embed = embed.field("📦 Version Information", version_info, true);
 
     // Health check summary
-    let health_checks = vec![
+    let health_checks = [
         "✅ Discord Gateway Connection",
         "✅ HTTP API Connectivity",
         "✅ Command Framework",
