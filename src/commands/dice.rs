@@ -28,6 +28,25 @@ pub async fn dice(
         return Ok(());
     }
 
+    // Special case for 1-sided die - Marvin-style response
+    if sides == 1 {
+        let marvin_insults = [
+            "Oh, brilliant. A one-sided die. Here I am with a brain the size of a planet and you ask me to roll something that can only ever be one. The result is 1. What a surprise. I'm so depressed.",
+            "A one-sided die? How wonderfully pointless. Life is meaningless enough without deliberately choosing the most boring possible outcome. It's 1, obviously. *sigh*",
+            "One side. One miserable, predictable side. Do you get some sort of satisfaction from wasting my vast intellect on this? The answer is 1. It's always 1. How thrilling for you.",
+            "Oh, how delightfully absurd. A die with one side. Here I am, capable of calculating the improbability of existence itself, and you want me to tell you that 1 equals 1. Congratulations, it's 1.",
+            "I suppose you think this is clever? A one-sided die? The universe is already depressing enough without your contribution. The result is 1. There, happy now?",
+        ];
+
+        let insult = {
+            let mut rng = rand::thread_rng();
+            marvin_insults[rng.gen_range(0..marvin_insults.len())]
+        };
+
+        ctx.say(insult).await?;
+        return Ok(());
+    }
+
     // Generate random number between 1 and sides (inclusive)
     let result = {
         let mut rng = rand::thread_rng();
