@@ -11,8 +11,8 @@ mod utils;
 use commands::{
     board, cleanup, coinflip, dice, endgame, endhangman, endttt, gamestatus, guess, hangman,
     hangmanhint, hangmanstatus, hello, help, hint, invite, kys, letter, move_ttt, numberguess, pfp,
-    ping, poll, react, remind, spamping, start_reminder_checker, stats, tictactoe, update, uwu,
-    yourmom,
+    ping, poll, react, remind, spamping, start_reminder_checker, stats, status, tictactoe, update,
+    uwu, yourmom,
 };
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -81,6 +81,7 @@ async fn main() {
                 pfp(),
                 yourmom(),
                 stats(),
+                status(),
                 update(),
                 kys(),
                 poll(),
