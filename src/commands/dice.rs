@@ -143,7 +143,7 @@ mod tests {
         for _ in 0..100 {
             let result = rng.gen_range(1..=6);
             assert!(
-                result >= 1 && result <= 6,
+                (1..=6).contains(&result),
                 "6-sided die result {} out of range",
                 result
             );
@@ -153,7 +153,7 @@ mod tests {
         for _ in 0..100 {
             let result = rng.gen_range(1..=20);
             assert!(
-                result >= 1 && result <= 20,
+                (1..=20).contains(&result),
                 "20-sided die result {} out of range",
                 result
             );
