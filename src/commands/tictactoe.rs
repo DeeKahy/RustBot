@@ -337,33 +337,40 @@ pub async fn move_ttt(
 ) -> Result<(), Error> {
     let user_id = ctx.author().id.get();
 
-    // Lock and get/update game state in one operation to prevent race conditions
-    let mut games = ACTIVE_GAMES.write().await;
-
-    let game = match games.get_mut(&user_id) {
-        Some(game) => game,
-        None => {
-            drop(games);
-            ctx.say("❌ You don't have an active Tic-Tac-Toe game! Start one with `/tictactoe`")
+    // Get current game state and extract needed info
+    let (mut updated_game, player_x_id, player_o_id) = {
+        let games = ACTIVE_GAMES.read().await;
+        match games.get(&user_id) {
+            Some(game) => {
+                let game_clone = game.clone();
+                (
+                    game_clone.clone(),
+                    game_clone.player_x_id,
+                    game_clone.player_o_id,
+                )
+            }
+            None => {
+                ctx.say(
+                    "❌ You don't have an active Tic-Tac-Toe game! Start one with `/tictactoe`",
+                )
                 .await?;
-            return Ok(());
+                return Ok(());
+            }
         }
     };
 
     // Check if it's the user's turn
-    let current_player_id = game.get_current_player_id();
+    let current_player_id = updated_game.get_current_player_id();
     if current_player_id != Some(user_id) {
-        if game.is_ai_game {
-            drop(games);
+        if updated_game.is_ai_game {
             ctx.say("❌ It's the AI's turn! Wait for the AI to move.")
                 .await?;
         } else {
-            let other_player = if game.player_x_id == user_id {
-                game.player_o_id.unwrap()
+            let other_player = if updated_game.player_x_id == user_id {
+                updated_game.player_o_id.unwrap()
             } else {
-                game.player_x_id
+                updated_game.player_x_id
             };
-            drop(games);
             ctx.say(format!("❌ It's <@{}>'s turn!", other_player))
                 .await?;
         }
@@ -371,14 +378,14 @@ pub async fn move_ttt(
     }
 
     // Try to make the move
-    match game.make_move(position as usize) {
+    match updated_game.make_move(position as usize) {
         Ok(_) => {
             // Check for win or tie
-            if let Some(winner) = game.check_winner() {
+            if let Some(winner) = updated_game.check_winner() {
                 let winner_id = if winner == Player::X {
-                    game.player_x_id
+                    updated_game.player_x_id
                 } else {
-                    game.player_o_id.unwrap_or(0) // 0 for AI
+                    updated_game.player_o_id.unwrap_or(0) // 0 for AI
                 };
 
                 let winner_text = if winner_id == 0 {
@@ -390,114 +397,119 @@ pub async fn move_ttt(
                 let response = format!(
                     "{}\n{}\n\nGame over! Use `/tictactoe` to start a new game.",
                     winner_text,
-                    game.display_board()
+                    updated_game.display_board()
                 );
 
                 // Remove game for both players
-                let player_x_id = game.player_x_id;
-                let player_o_id = game.player_o_id;
-                games.remove(&player_x_id);
-                if let Some(opponent_id) = player_o_id {
-                    games.remove(&opponent_id);
+                {
+                    let mut games = ACTIVE_GAMES.write().await;
+                    games.remove(&player_x_id);
+                    if let Some(opponent_id) = player_o_id {
+                        games.remove(&opponent_id);
+                    }
                 }
-                drop(games);
 
                 ctx.say(response).await?;
                 return Ok(());
-            } else if game.is_board_full() {
+            } else if updated_game.is_board_full() {
                 let response = format!(
                     "🤝 **It's a tie!**\n{}\n\nGame over! Use `/tictactoe` to start a new game.",
-                    game.display_board()
+                    updated_game.display_board()
                 );
 
                 // Remove game for both players
-                let player_x_id = game.player_x_id;
-                let player_o_id = game.player_o_id;
-                games.remove(&player_x_id);
-                if let Some(opponent_id) = player_o_id {
-                    games.remove(&opponent_id);
+                {
+                    let mut games = ACTIVE_GAMES.write().await;
+                    games.remove(&player_x_id);
+                    if let Some(opponent_id) = player_o_id {
+                        games.remove(&opponent_id);
+                    }
                 }
-                drop(games);
 
                 ctx.say(response).await?;
                 return Ok(());
             }
 
-            game.switch_player();
+            updated_game.switch_player();
 
             // Handle AI move if it's an AI game and now AI's turn
-            if game.is_ai_game && game.current_player == Player::O {
-                if let Some(ai_move) = game.get_ai_move() {
-                    game.make_move(ai_move).unwrap();
+            if updated_game.is_ai_game && updated_game.current_player == Player::O {
+                if let Some(ai_move) = updated_game.get_ai_move() {
+                    updated_game.make_move(ai_move).unwrap();
 
                     // Check for AI win or tie after AI move
-                    if let Some(_winner) = game.check_winner() {
+                    if let Some(_winner) = updated_game.check_winner() {
                         let response = format!(
                             "🤖 **AI wins!**\nAI played position {}\n{}\n\nGame over! Use `/tictactoe` to start a new game.",
                             ai_move,
-                            game.display_board()
+                            updated_game.display_board()
                         );
 
-                        let player_x_id = game.player_x_id;
-                        games.remove(&player_x_id);
-                        drop(games);
+                        // Remove game
+                        {
+                            let mut games = ACTIVE_GAMES.write().await;
+                            games.remove(&player_x_id);
+                        }
 
                         ctx.say(response).await?;
                         return Ok(());
-                    } else if game.is_board_full() {
+                    } else if updated_game.is_board_full() {
                         let response = format!(
                             "🤝 **It's a tie!**\nAI played position {}\n{}\n\nGame over! Use `/tictactoe` to start a new game.",
                             ai_move,
-                            game.display_board()
+                            updated_game.display_board()
                         );
 
-                        let player_x_id = game.player_x_id;
-                        games.remove(&player_x_id);
-                        drop(games);
+                        // Remove game
+                        {
+                            let mut games = ACTIVE_GAMES.write().await;
+                            games.remove(&player_x_id);
+                        }
 
                         ctx.say(response).await?;
                         return Ok(());
                     }
 
-                    game.switch_player();
+                    updated_game.switch_player();
 
                     // Show board after AI move
                     let response = format!(
                         "🤖 AI played position **{}**\n{}\n\nYour turn! {} Use `/move <position>`",
                         ai_move,
-                        game.display_board(),
+                        updated_game.display_board(),
                         ctx.author().mention()
                     );
-                    drop(games);
+
                     ctx.say(response).await?;
                 }
             } else {
                 // Show current board state for human vs human
-                let current_player_mention = if game.current_player == Player::X {
-                    format!("<@{}>", game.player_x_id)
+                let current_player_mention = if updated_game.current_player == Player::X {
+                    format!("<@{}>", updated_game.player_x_id)
                 } else {
-                    format!("<@{}>", game.player_o_id.unwrap())
+                    format!("<@{}>", updated_game.player_o_id.unwrap())
                 };
 
                 let response = format!(
                     "{}\n\nCurrent turn: {} {}",
-                    game.display_board(),
-                    game.current_player,
+                    updated_game.display_board(),
+                    updated_game.current_player,
                     current_player_mention
                 );
 
-                // Update the opponent's game state to match
-                let game_clone = game.clone();
-                if let Some(opponent_id) = game.player_o_id {
-                    games.insert(opponent_id, game_clone);
-                }
-                drop(games);
-
                 ctx.say(response).await?;
+            }
+
+            // Always update both players' game states after any move
+            {
+                let mut games = ACTIVE_GAMES.write().await;
+                games.insert(player_x_id, updated_game.clone());
+                if let Some(opponent_id) = player_o_id {
+                    games.insert(opponent_id, updated_game);
+                }
             }
         }
         Err(msg) => {
-            drop(games);
             ctx.say(format!("❌ {}", msg)).await?;
         }
     }
