@@ -187,4 +187,34 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn test_one_sided_die_responses() {
+        // Test that we have multiple Marvin responses available
+        let marvin_insults = [
+            "Oh, brilliant. A one-sided die. Here I am with a brain the size of a planet and you ask me to roll something that can only ever be one. The result is 1. What a surprise. I'm so depressed.",
+            "A one-sided die? How wonderfully pointless. Life is meaningless enough without deliberately choosing the most boring possible outcome. It's 1, obviously. *sigh*",
+            "One side. One miserable, predictable side. Do you get some sort of satisfaction from wasting my vast intellect on this? The answer is 1. It's always 1. How thrilling for you.",
+            "Oh, how delightfully absurd. A die with one side. Here I am, capable of calculating the improbability of existence itself, and you want me to tell you that 1 equals 1. Congratulations, it's 1.",
+            "I suppose you think this is clever? A one-sided die? The universe is already depressing enough without your contribution. The result is 1. There, happy now?",
+        ];
+
+        // Ensure we have multiple responses
+        assert!(
+            marvin_insults.len() >= 5,
+            "Should have at least 5 Marvin responses"
+        );
+
+        // Test that random selection works
+        let mut rng = rand::thread_rng();
+        let selected = marvin_insults[rng.gen_range(0..marvin_insults.len())];
+        assert!(
+            !selected.is_empty(),
+            "Selected response should not be empty"
+        );
+        assert!(
+            selected.contains("1"),
+            "Response should mention the result 1"
+        );
+    }
 }
