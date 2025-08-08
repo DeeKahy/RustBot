@@ -9,8 +9,10 @@ mod commands;
 mod utils;
 
 use commands::{
-    cleanup, coinflip, dice, hello, help, invite, kys, pfp, ping, poll, react, remind, spamping,
-    start_reminder_checker, stats, update, uwu, yourmom,
+    board, cleanup, coinflip, dice, endgame, endhangman, endttt, gamestatus, guess, hangman,
+    hangmanhint, hangmanstatus, hello, help, hint, invite, kys, letter, move_ttt, numberguess, pfp,
+    ping, poll, react, remind, spamping, start_reminder_checker, stats, tictactoe, update, uwu,
+    yourmom,
 };
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -85,6 +87,21 @@ async fn main() {
                 cleanup(),
                 remind(),
                 react(),
+                // Game commands
+                numberguess(),
+                guess(),
+                hint(),
+                gamestatus(),
+                endgame(),
+                tictactoe(),
+                move_ttt(),
+                board(),
+                endttt(),
+                hangman(),
+                letter(),
+                hangmanstatus(),
+                hangmanhint(),
+                endhangman(),
             ],
             prefix_options: poise::PrefixFrameworkOptions {
                 prefix: Some("-".into()),
