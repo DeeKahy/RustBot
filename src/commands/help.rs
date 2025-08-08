@@ -41,7 +41,7 @@ async fn show_general_help(ctx: Context<'_>) -> Result<(), Error> {
         )
         .field(
             "🎯 Fun Commands",
-            "• `-coinflip` - Flip a coin (heads or tails)\n• `-uwu <text>` - Convert text to uwu speak\n• `-yourmom` - Get a random \"your mom\" joke\n• `-spamping <count>` - Send multiple ping messages",
+            "• `-coinflip` - Flip a coin (heads or tails)\n• `-dice [sides]` - Roll a dice (defaults to 6 sides, try 1 for fun)\n• `-uwu <text>` - Convert text to uwu speak\n• `-yourmom` - Get a random \"your mom\" joke\n• `-spamping <count>` - Send multiple ping messages",
             false
         )
         .field(
@@ -95,6 +95,15 @@ async fn show_command_help(ctx: Context<'_>, command_name: &str) -> Result<(), E
             usage: "`-coinflip` or `/coinflip`",
             examples: vec!["-coinflip"],
             parameters: vec![],
+        },
+        "dice" => CommandInfo {
+            name: "dice",
+            description: "Roll a dice with specified number of sides (defaults to 6)",
+            usage: "`-dice [sides]` or `/dice [sides]`",
+            examples: vec!["-dice", "-dice 20", "-dice 100", "-dice 1"],
+            parameters: vec![
+                "sides (optional): Number of sides on the dice (1-1000, defaults to 6)",
+            ],
         },
         "uwu" => CommandInfo {
             name: "uwu",

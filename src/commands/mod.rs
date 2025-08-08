@@ -1,6 +1,7 @@
 // Commands module - imports all individual command files
 pub mod cleanup;
 pub mod coinflip;
+pub mod dice;
 pub mod general;
 pub mod hello;
 pub mod help;
@@ -20,6 +21,7 @@ pub mod yourmom;
 // Re-export all commands for easy access from main.rs
 pub use cleanup::cleanup;
 pub use coinflip::coinflip;
+pub use dice::dice;
 pub use hello::hello;
 pub use help::help;
 pub use invite::invite;
