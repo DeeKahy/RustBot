@@ -51,29 +51,26 @@ struct TicTacToeGame {
 }
 
 impl TicTacToeGame {
-    // Helper function to edit the game message or send a new one as fallback
-    async fn edit_or_send_message(&self, ctx: &Context<'_>, content: String) -> Result<(), Error> {
+    // Helper function to delete the previous message and send a new one
+    async fn delete_and_send_message(
+        &self,
+        ctx: &Context<'_>,
+        content: String,
+    ) -> Result<u64, Error> {
+        // Delete the previous message if it exists
         if let Some(msg_id) = self.message_id {
             let msg_id = serenity::MessageId::new(msg_id);
             let channel_id = serenity::ChannelId::new(self.channel_id);
 
-            // Try to edit the existing message
-            if let Err(_) = channel_id
-                .edit_message(
-                    &ctx.serenity_context().http,
-                    msg_id,
-                    serenity::EditMessage::new().content(&content),
-                )
-                .await
-            {
-                // If editing fails, send a new message
-                ctx.say(content).await?;
-            }
-        } else {
-            // No message ID stored, send a new message
-            ctx.say(content).await?;
+            // Try to delete the previous message (ignore errors if message doesn't exist)
+            let _ = channel_id
+                .delete_message(&ctx.serenity_context().http, msg_id)
+                .await;
         }
-        Ok(())
+
+        // Send the new message and return its ID
+        let reply = ctx.say(content).await?;
+        Ok(reply.message().await?.id.get())
     }
 
     fn new_two_player(player_x_id: u64, player_o_id: u64, channel_id: u64) -> Self {
@@ -443,7 +440,7 @@ pub async fn move_ttt(
                     }
                 }
 
-                updated_game.edit_or_send_message(&ctx, response).await?;
+                updated_game.delete_and_send_message(&ctx, response).await?;
                 return Ok(());
             } else if updated_game.is_board_full() {
                 let response = format!(
@@ -460,7 +457,7 @@ pub async fn move_ttt(
                     }
                 }
 
-                updated_game.edit_or_send_message(&ctx, response).await?;
+                updated_game.delete_and_send_message(&ctx, response).await?;
                 return Ok(());
             }
 
@@ -485,7 +482,7 @@ pub async fn move_ttt(
                             games.remove(&player_x_id);
                         }
 
-                        ctx.say(response).await?;
+                        updated_game.delete_and_send_message(&ctx, response).await?;
                         return Ok(());
                     } else if updated_game.is_board_full() {
                         let response = format!(
@@ -500,7 +497,7 @@ pub async fn move_ttt(
                             games.remove(&player_x_id);
                         }
 
-                        updated_game.edit_or_send_message(&ctx, response).await?;
+                        updated_game.delete_and_send_message(&ctx, response).await?;
                         return Ok(());
                     }
 
@@ -514,7 +511,8 @@ pub async fn move_ttt(
                         ctx.author().mention()
                     );
 
-                    updated_game.edit_or_send_message(&ctx, response).await?;
+                    let new_msg_id = updated_game.delete_and_send_message(&ctx, response).await?;
+                    updated_game.message_id = Some(new_msg_id);
                 }
             } else {
                 // Show current board state for human vs human
@@ -531,7 +529,8 @@ pub async fn move_ttt(
                     current_player_mention
                 );
 
-                updated_game.edit_or_send_message(&ctx, response).await?;
+                let new_msg_id = updated_game.delete_and_send_message(&ctx, response).await?;
+                updated_game.message_id = Some(new_msg_id);
             }
 
             // Always update both players' game states after any move
