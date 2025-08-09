@@ -25,6 +25,7 @@ A modern Discord bot built with Rust using the Serenity library and Poise comman
 - `-ping` - Responds with "Pong!" and shows latency
 - `-hello [name]` - Says hello to you or the specified name
 - `-help [command]` - Shows all available commands or detailed help for a specific command
+- `-status` - Shows comprehensive bot diagnostic information and health status
 - `-spamping @user [count]` - Creates a thread and pings the user repeatedly
 - `-uwu <text>` - Transform text into uwu speak
 - `-coinflip` - Flip a coin (heads or tails)
