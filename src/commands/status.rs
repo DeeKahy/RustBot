@@ -253,7 +253,7 @@ mod tests {
     #[test]
     fn test_health_check_format() {
         // Test that health check items are properly formatted
-        let health_checks = vec![
+        let health_checks = [
             "✅ Discord Gateway Connection",
             "✅ HTTP API Connectivity",
             "✅ Command Framework",
@@ -267,7 +267,7 @@ mod tests {
     #[test]
     fn test_capabilities_list() {
         // Test that capabilities list is properly structured
-        let capabilities = vec![
+        let capabilities = [
             "✅ Prefix Commands (-command)",
             "✅ Slash Commands (/command)",
             "✅ Message Content Access",
