@@ -20,6 +20,7 @@ pub mod status;
 pub mod tictactoe;
 pub mod update;
 pub mod uwu;
+pub mod yeet;
 pub mod yourmom;
 
 // Re-export all commands for easy access from main.rs
@@ -43,6 +44,7 @@ pub use status::status;
 pub use tictactoe::{board, endttt, move_ttt, tictactoe};
 pub use update::update;
 pub use uwu::uwu;
+pub use yeet::yeet;
 pub use yourmom::yourmom;
 
 // You can add more command modules here as needed
