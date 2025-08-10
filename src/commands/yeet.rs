@@ -9,14 +9,14 @@ use tempfile::NamedTempFile;
 #[poise::command(prefix_command, slash_command)]
 pub async fn yeet(
     ctx: Context<'_>,
-    #[description = "User to yeet"] user: Option<serenity::User>,
+    #[description = "User to call a hit on"] user: Option<serenity::User>,
 ) -> Result<(), Error> {
-    log::info!("Yeet command called by {}", ctx.author().name);
+    log::info!("Hit ordered by {}", ctx.author().name);
 
     let target_user = user.unwrap_or_else(|| ctx.author().clone());
 
     // Send initial "thinking" message
-    let thinking_msg = ctx.say("🚀 Preparing the yeet cannon...").await?;
+    let thinking_msg = ctx.say("Loading the gun...").await?;
 
     // Get the user's avatar URL
     let avatar_url = target_user
@@ -71,7 +71,7 @@ pub async fn yeet(
     thinking_msg
         .edit(
             ctx,
-            poise::CreateReply::default().content("🎯 Loading the yeet cannon..."),
+            poise::CreateReply::default().content("Aiming..."),
         )
         .await?;
 
@@ -82,7 +82,7 @@ pub async fn yeet(
             thinking_msg
                 .edit(
                     ctx,
-                    poise::CreateReply::default().content("🚀 Firing the yeet cannon..."),
+                    poise::CreateReply::default().content("Firing!"),
                 )
                 .await?;
 
@@ -105,7 +105,7 @@ pub async fn yeet(
             let attachment = serenity::CreateAttachment::bytes(gif_data, "yeet.gif");
 
             let reply = poise::CreateReply::default()
-                .content(format!("🚀💨 {} has been YEETED! 💥", target_user.name))
+                .content(format!("{} successfully assassinated!", target_user.name))
                 .attachment(attachment);
 
             thinking_msg.edit(ctx, reply).await?;
