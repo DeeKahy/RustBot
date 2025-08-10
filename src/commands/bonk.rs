@@ -23,6 +23,9 @@ pub async fn bonk(
         }
     };
 
+    // Defer response for slash commands to prevent timeout
+    ctx.defer().await?;
+
     // Send initial "thinking" message
     let thinking_msg = ctx.say("Loading the bonk...").await?;
 
