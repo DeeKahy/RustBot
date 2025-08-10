@@ -18,14 +18,14 @@ pub async fn bonk(
     let target_user = match user {
         Some(user) => user,
         None => {
-            ctx.say("🔨 You need to specify a target! Use `-bonk @someone` to bonk them.")
+            ctx.say("You need to specify a target! Use `-bonk @someone` to bonk them.")
                 .await?;
             return Ok(());
         }
     };
 
     // Send initial "thinking" message
-    let thinking_msg = ctx.say("🔨 Preparing the bonk hammer...").await?;
+    let thinking_msg = ctx.say("Loading the bonk...").await?;
 
     // Get the user's avatar URL
     let avatar_url = target_user
@@ -78,10 +78,7 @@ pub async fn bonk(
 
     // Update status
     thinking_msg
-        .edit(
-            ctx,
-            poise::CreateReply::default().content("🎯 Taking aim with the bonk hammer..."),
-        )
+        .edit(ctx, poise::CreateReply::default().content("Taking aim..."))
         .await?;
 
     // Select a random bonk GIF and extract positioning data
@@ -92,7 +89,7 @@ pub async fn bonk(
                 Ok(output_path) => {
                     // Update status
                     thinking_msg
-                        .edit(ctx, poise::CreateReply::default().content("💥 BONK!"))
+                        .edit(ctx, poise::CreateReply::default().content("Bonking!"))
                         .await?;
 
                     // Read the processed GIF
@@ -114,10 +111,7 @@ pub async fn bonk(
                     let attachment = serenity::CreateAttachment::bytes(gif_data, "bonk.gif");
 
                     let reply = poise::CreateReply::default()
-                        .content(format!(
-                            "🔨💥 {} got BONKED! *horny jail intensifies*",
-                            target_user.name
-                        ))
+                        .content(format!("{} successfully bonked!", target_user.name))
                         .attachment(attachment);
 
                     thinking_msg.edit(ctx, reply).await?;
