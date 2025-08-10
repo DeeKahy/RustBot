@@ -5,26 +5,26 @@ use rand::seq::SliceRandom;
 use std::fs;
 use tempfile::NamedTempFile;
 
-/// Orders a hit on a user by putting their profile picture on a random hit GIF
+/// Bonks a user by putting their profile picture on a random bonk GIF
 #[poise::command(prefix_command, slash_command)]
-pub async fn hit(
+pub async fn bonk(
     ctx: Context<'_>,
-    #[description = "User to call a hit on"] user: Option<serenity::User>,
+    #[description = "User to bonk"] user: Option<serenity::User>,
 ) -> Result<(), Error> {
-    log::info!("Hit command called by {}", ctx.author().name);
+    log::info!("Bonk command called by {}", ctx.author().name);
 
     // Check if no user was provided
     let target_user = match user {
         Some(user) => user,
         None => {
-            ctx.say("🎯 You need to specify a target! Use `-hit @someone` to order a hit.")
+            ctx.say("You need to specify a target! Use `-bonk @someone` to bonk them.")
                 .await?;
             return Ok(());
         }
     };
 
     // Send initial "thinking" message
-    let thinking_msg = ctx.say("Loading the gun...").await?;
+    let thinking_msg = ctx.say("Loading the bonk...").await?;
 
     // Get the user's avatar URL
     let avatar_url = target_user
@@ -39,7 +39,7 @@ pub async fn hit(
                 .edit(
                     ctx,
                     poise::CreateReply::default()
-                        .content(format!("❌ Failed to identify target: {}", e)),
+                        .content(format!("❌ Failed to download profile picture: {}", e)),
                 )
                 .await?;
             return Ok(());
@@ -53,7 +53,7 @@ pub async fn hit(
                 .edit(
                     ctx,
                     poise::CreateReply::default()
-                        .content(format!("❌ Target intel corrupted: {}", e)),
+                        .content(format!("❌ Failed to read profile picture data: {}", e)),
                 )
                 .await?;
             return Ok(());
@@ -68,7 +68,7 @@ pub async fn hit(
                 .edit(
                     ctx,
                     poise::CreateReply::default()
-                        .content(format!("❌ Failed to process target photo: {}", e)),
+                        .content(format!("❌ Failed to process profile picture: {}", e)),
                 )
                 .await?;
             return Ok(());
@@ -77,18 +77,18 @@ pub async fn hit(
 
     // Update status
     thinking_msg
-        .edit(ctx, poise::CreateReply::default().content("Aiming..."))
+        .edit(ctx, poise::CreateReply::default().content("Taking aim..."))
         .await?;
 
-    // Select a random hit GIF and extract positioning data
-    match select_random_hit_gif().await {
-        Ok((gif_path, hit_data)) => {
+    // Select a random bonk GIF and extract positioning data
+    match select_random_bonk_gif().await {
+        Ok((gif_path, bonk_data)) => {
             // Process the GIF with the profile picture overlay
-            match process_hit_gif(&avatar_img, &gif_path, &hit_data).await {
+            match process_bonk_gif(&avatar_img, &gif_path, &bonk_data).await {
                 Ok(output_path) => {
                     // Update status
                     thinking_msg
-                        .edit(ctx, poise::CreateReply::default().content("Firing!"))
+                        .edit(ctx, poise::CreateReply::default().content("Bonking!"))
                         .await?;
 
                     // Read the processed GIF
@@ -107,10 +107,10 @@ pub async fn hit(
                     };
 
                     // Send the GIF
-                    let attachment = serenity::CreateAttachment::bytes(gif_data, "hit.gif");
+                    let attachment = serenity::CreateAttachment::bytes(gif_data, "bonk.gif");
 
                     let reply = poise::CreateReply::default()
-                        .content(format!("{} successfully assassinated!", target_user.name))
+                        .content(format!("{} successfully bonked!", target_user.name))
                         .attachment(attachment);
 
                     thinking_msg.edit(ctx, reply).await?;
@@ -123,7 +123,7 @@ pub async fn hit(
                         .edit(
                             ctx,
                             poise::CreateReply::default()
-                                .content(format!("❌ Contract failed: {}", e)),
+                                .content(format!("❌ Failed to process bonk GIF: {}", e)),
                         )
                         .await?;
                 }
@@ -134,7 +134,7 @@ pub async fn hit(
                 .edit(
                     ctx,
                     poise::CreateReply::default()
-                        .content(format!("❌ No hit GIFs available: {}", e)),
+                        .content(format!("❌ No bonk GIFs available: {}", e)),
                 )
                 .await?;
         }
@@ -144,18 +144,18 @@ pub async fn hit(
 }
 
 #[derive(Debug)]
-struct HitData {
+struct BonkData {
     x_percent: f32,
     y_percent: f32,
     scale_percent: f32,
 }
 
-async fn select_random_hit_gif(
-) -> Result<(String, HitData), Box<dyn std::error::Error + Send + Sync>> {
-    let hit_dir = "assets/hit";
+async fn select_random_bonk_gif(
+) -> Result<(String, BonkData), Box<dyn std::error::Error + Send + Sync>> {
+    let bonk_dir = "assets/bonk";
 
-    // Read all files in the hit directory
-    let entries = fs::read_dir(hit_dir)?;
+    // Read all files in the bonk directory
+    let entries = fs::read_dir(bonk_dir)?;
     let mut gif_files = Vec::new();
 
     for entry in entries {
@@ -163,14 +163,14 @@ async fn select_random_hit_gif(
         let path = entry.path();
 
         if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
-            if filename.ends_with(".gif") && filename.starts_with("hit_") {
+            if filename.ends_with(".gif") && filename.starts_with("bonk_") {
                 gif_files.push(path.to_string_lossy().to_string());
             }
         }
     }
 
     if gif_files.is_empty() {
-        return Err("No hit GIFs found in assets/hit directory".into());
+        return Err("No bonk GIFs found in assets/bonk directory".into());
     }
 
     // Select a random GIF
@@ -178,13 +178,15 @@ async fn select_random_hit_gif(
     let selected_gif = gif_files.choose(&mut rng).unwrap();
 
     // Parse the filename to extract positioning data
-    let hit_data = parse_hit_filename(selected_gif)?;
+    let bonk_data = parse_bonk_filename(selected_gif)?;
 
-    Ok((selected_gif.clone(), hit_data))
+    Ok((selected_gif.clone(), bonk_data))
 }
 
-fn parse_hit_filename(filename: &str) -> Result<HitData, Box<dyn std::error::Error + Send + Sync>> {
-    // Expected format: hit_1_x0.1_y0.4_s0.3.gif
+fn parse_bonk_filename(
+    filename: &str,
+) -> Result<BonkData, Box<dyn std::error::Error + Send + Sync>> {
+    // Expected format: bonk_1_x0.2_y0.3_s0.25.gif
     let basename = filename
         .split('/')
         .next_back()
@@ -193,8 +195,8 @@ fn parse_hit_filename(filename: &str) -> Result<HitData, Box<dyn std::error::Err
 
     let parts: Vec<&str> = basename.split('_').collect();
 
-    if parts.len() < 5 || parts[0] != "hit" {
-        return Err(format!("Invalid hit filename format: {}", filename).into());
+    if parts.len() < 5 || parts[0] != "bonk" {
+        return Err(format!("Invalid bonk filename format: {}", filename).into());
     }
 
     let mut x_percent = 0.1; // default values
@@ -212,17 +214,17 @@ fn parse_hit_filename(filename: &str) -> Result<HitData, Box<dyn std::error::Err
         }
     }
 
-    Ok(HitData {
+    Ok(BonkData {
         x_percent,
         y_percent,
         scale_percent,
     })
 }
 
-async fn process_hit_gif(
+async fn process_bonk_gif(
     avatar_img: &DynamicImage,
     gif_path: &str,
-    hit_data: &HitData,
+    bonk_data: &BonkData,
 ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
     // Open the original GIF using image crate
     let gif_file = std::fs::File::open(gif_path)?;
@@ -239,15 +241,15 @@ async fn process_hit_gif(
     let first_frame = &frames[0];
     let (screen_width, screen_height) = first_frame.buffer().dimensions();
 
-    // Calculate profile picture size and position based on hit data
-    let pfp_size = (screen_height as f32 * hit_data.scale_percent) as u32;
+    // Calculate profile picture size and position based on bonk data
+    let pfp_size = (screen_height as f32 * bonk_data.scale_percent) as u32;
     let resized_avatar = avatar_img
         .resize_exact(pfp_size, pfp_size, image::imageops::FilterType::Lanczos3)
         .to_rgba8();
 
     // Calculate position from percentages
-    let overlay_x = (screen_width as f32 * hit_data.x_percent) as u32;
-    let overlay_y = (screen_height as f32 * hit_data.y_percent) as u32;
+    let overlay_x = (screen_width as f32 * bonk_data.x_percent) as u32;
+    let overlay_y = (screen_height as f32 * bonk_data.y_percent) as u32;
 
     // Process frames and create new GIF
     let temp_file = NamedTempFile::new()?;
@@ -311,16 +313,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_hit_filename() {
-        let result = parse_hit_filename("assets/hit/hit_1_x0.1_y0.4_s0.3.gif").unwrap();
-        assert_eq!(result.x_percent, 0.1);
-        assert_eq!(result.y_percent, 0.4);
-        assert_eq!(result.scale_percent, 0.3);
+    fn test_parse_bonk_filename() {
+        let result = parse_bonk_filename("assets/bonk/bonk_1_x0.2_y0.3_s0.25.gif").unwrap();
+        assert_eq!(result.x_percent, 0.2);
+        assert_eq!(result.y_percent, 0.3);
+        assert_eq!(result.scale_percent, 0.25);
     }
 
     #[test]
-    fn test_hit_command_exists() {
-        let function_name = "hit";
-        assert_eq!(function_name.len(), 3);
+    fn test_bonk_command_exists() {
+        let function_name = "bonk";
+        assert_eq!(function_name.len(), 4);
     }
 }
