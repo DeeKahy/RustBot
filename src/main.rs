@@ -10,9 +10,9 @@ mod utils;
 
 use commands::{
     board, cleanup, coinflip, dice, endgame, endhangman, endttt, gamestatus, guess, hangman,
-    hangmanhint, hangmanstatus, hello, help, hint, invite, kys, letter, move_ttt, numberguess, pfp,
-    ping, poll, react, remind, spamping, start_reminder_checker, stats, status, tictactoe, update,
-    uwu, yourmom,
+    hangmanhint, hangmanstatus, hello, help, hint, hit, invite, kys, letter, move_ttt, numberguess,
+    pfp, ping, poll, react, remind, spamping, start_reminder_checker, stats, status, tictactoe,
+    update, uwu, yourmom,
 };
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -88,6 +88,7 @@ async fn main() {
                 cleanup(),
                 remind(),
                 react(),
+                hit(),
                 // Game commands
                 numberguess(),
                 guess(),
