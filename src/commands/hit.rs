@@ -187,7 +187,7 @@ fn parse_hit_filename(filename: &str) -> Result<HitData, Box<dyn std::error::Err
     // Expected format: hit_1_x0.1_y0.4_s0.3.gif
     let basename = filename
         .split('/')
-        .last()
+        .next_back()
         .unwrap_or(filename)
         .trim_end_matches(".gif");
 

@@ -189,7 +189,7 @@ fn parse_bonk_filename(
     // Expected format: bonk_1_x0.2_y0.3_s0.25.gif
     let basename = filename
         .split('/')
-        .last()
+        .next_back()
         .unwrap_or(filename)
         .trim_end_matches(".gif");
 
