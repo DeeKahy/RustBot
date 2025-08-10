@@ -1,9 +1,8 @@
 use crate::{Context, Error};
-use image::DynamicImage;
+use image::{AnimationDecoder, DynamicImage};
 use poise::serenity_prelude as serenity;
 use rand::seq::SliceRandom;
 use std::fs;
-use std::io::Cursor;
 use tempfile::NamedTempFile;
 
 /// Bonks a user by putting their profile picture on a random bonk GIF
@@ -227,124 +226,85 @@ async fn process_bonk_gif(
     gif_path: &str,
     bonk_data: &BonkData,
 ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-    // Load the selected bonk GIF
-    let gif_data = fs::read(gif_path)?;
+    // Open the original GIF using image crate
+    let gif_file = std::fs::File::open(gif_path)?;
+    let decoder = image::codecs::gif::GifDecoder::new(gif_file)?;
+    let frames = decoder.into_frames();
+    let frames: Result<Vec<_>, _> = frames.collect();
+    let frames = frames?;
 
-    // Decode the GIF
-    let mut decoder = gif::DecodeOptions::new();
-    decoder.set_color_output(gif::ColorOutput::RGBA);
-    let mut gif_decoder = decoder.read_info(Cursor::new(&gif_data))?;
+    if frames.is_empty() {
+        return Err("GIF has no frames".into());
+    }
 
-    let screen_width = gif_decoder.width() as u32;
-    let screen_height = gif_decoder.height() as u32;
+    // Get dimensions from first frame
+    let first_frame = &frames[0];
+    let (screen_width, screen_height) = first_frame.buffer().dimensions();
 
     // Calculate profile picture size and position based on bonk data
     let pfp_size = (screen_height as f32 * bonk_data.scale_percent) as u32;
-    let resized_avatar =
-        avatar_img.resize_exact(pfp_size, pfp_size, image::imageops::FilterType::Lanczos3);
+    let resized_avatar = avatar_img
+        .resize_exact(pfp_size, pfp_size, image::imageops::FilterType::Lanczos3)
+        .to_rgba8();
 
     // Calculate position from percentages
     let overlay_x = (screen_width as f32 * bonk_data.x_percent) as u32;
     let overlay_y = (screen_height as f32 * bonk_data.y_percent) as u32;
 
-    // Create a new GIF encoder
+    // Process frames and create new GIF
     let temp_file = NamedTempFile::new()?;
     let output_path = temp_file.path().to_string_lossy().to_string() + ".gif";
+    let output_file = std::fs::File::create(&output_path)?;
 
-    {
-        let output_file = std::fs::File::create(&output_path)?;
-        let mut encoder =
-            gif::Encoder::new(output_file, screen_width as u16, screen_height as u16, &[])?;
-        encoder.set_repeat(gif::Repeat::Infinite)?;
+    let mut encoder = image::codecs::gif::GifEncoder::new(output_file);
+    encoder.set_repeat(image::codecs::gif::Repeat::Infinite)?;
 
-        // Process each frame
-        let mut frame_count = 0;
-        let mut canvas = vec![0u8; (screen_width * screen_height * 4) as usize];
+    // Limit frames to prevent excessive processing
+    let frame_limit = std::cmp::min(frames.len(), 100);
 
-        while let Some(frame) = gif_decoder.read_next_frame()? {
-            frame_count += 1;
-            if frame_count > 100 {
-                // Limit to prevent excessive processing
-                break;
-            }
+    for frame in frames.iter().take(frame_limit) {
+        let mut frame_buffer = frame.buffer().clone();
 
-            // Clear canvas
-            canvas.fill(0);
+        // Overlay the profile picture with alpha blending
+        for y in 0..pfp_size {
+            for x in 0..pfp_size {
+                let dst_x = overlay_x + x;
+                let dst_y = overlay_y + y;
 
-            // Copy frame data to canvas
-            let frame_data = &frame.buffer;
-            let frame_width = frame.width as u32;
-            let frame_height = frame.height as u32;
-            let frame_left = frame.left as u32;
-            let frame_top = frame.top as u32;
+                if dst_x < screen_width && dst_y < screen_height {
+                    let avatar_pixel = resized_avatar.get_pixel(x, y);
+                    let alpha = avatar_pixel[3] as f32 / 255.0;
 
-            // Copy frame pixels to canvas
-            for y in 0..frame_height {
-                for x in 0..frame_width {
-                    let src_idx = ((y * frame_width + x) * 4) as usize;
-                    let dst_x = frame_left + x;
-                    let dst_y = frame_top + y;
+                    if alpha > 0.0 {
+                        let frame_pixel = frame_buffer.get_pixel_mut(dst_x, dst_y);
+                        let inv_alpha = 1.0 - alpha;
 
-                    if dst_x < screen_width
-                        && dst_y < screen_height
-                        && src_idx + 3 < frame_data.len()
-                    {
-                        let dst_idx = ((dst_y * screen_width + dst_x) * 4) as usize;
-
-                        if dst_idx + 3 < canvas.len() {
-                            canvas[dst_idx] = frame_data[src_idx]; // R
-                            canvas[dst_idx + 1] = frame_data[src_idx + 1]; // G
-                            canvas[dst_idx + 2] = frame_data[src_idx + 2]; // B
-                            canvas[dst_idx + 3] = frame_data[src_idx + 3]; // A
-                        }
+                        frame_pixel[0] = (avatar_pixel[0] as f32 * alpha
+                            + frame_pixel[0] as f32 * inv_alpha)
+                            as u8;
+                        frame_pixel[1] = (avatar_pixel[1] as f32 * alpha
+                            + frame_pixel[1] as f32 * inv_alpha)
+                            as u8;
+                        frame_pixel[2] = (avatar_pixel[2] as f32 * alpha
+                            + frame_pixel[2] as f32 * inv_alpha)
+                            as u8;
+                        frame_pixel[3] = ((avatar_pixel[3] as f32 * alpha
+                            + frame_pixel[3] as f32 * inv_alpha)
+                            .min(255.0)) as u8;
                     }
                 }
             }
-
-            // Overlay the profile picture
-            let avatar_rgba = resized_avatar.to_rgba8();
-            for y in 0..pfp_size {
-                for x in 0..pfp_size {
-                    let dst_x = overlay_x + x;
-                    let dst_y = overlay_y + y;
-
-                    if dst_x < screen_width && dst_y < screen_height {
-                        let src_pixel = avatar_rgba.get_pixel(x, y);
-                        let dst_idx = ((dst_y * screen_width + dst_x) * 4) as usize;
-
-                        if dst_idx + 3 < canvas.len() {
-                            let alpha = src_pixel[3] as f32 / 255.0;
-                            let inv_alpha = 1.0 - alpha;
-
-                            // Alpha blending
-                            canvas[dst_idx] = (src_pixel[0] as f32 * alpha
-                                + canvas[dst_idx] as f32 * inv_alpha)
-                                as u8;
-                            canvas[dst_idx + 1] = (src_pixel[1] as f32 * alpha
-                                + canvas[dst_idx + 1] as f32 * inv_alpha)
-                                as u8;
-                            canvas[dst_idx + 2] = (src_pixel[2] as f32 * alpha
-                                + canvas[dst_idx + 2] as f32 * inv_alpha)
-                                as u8;
-                            canvas[dst_idx + 3] = ((src_pixel[3] as f32 * alpha
-                                + canvas[dst_idx + 3] as f32 * inv_alpha)
-                                .min(255.0))
-                                as u8;
-                        }
-                    }
-                }
-            }
-
-            // Create output frame
-            let mut output_frame =
-                gif::Frame::from_rgba(screen_width as u16, screen_height as u16, &mut canvas);
-            output_frame.delay = frame.delay;
-            output_frame.dispose = frame.dispose;
-
-            encoder.write_frame(&output_frame)?;
         }
+
+        // Create frame with original delay
+        let delay = frame.delay().numer_denom_ms();
+        let frame_delay = image::Delay::from_numer_denom_ms(delay.0, delay.1);
+
+        let gif_frame = image::Frame::from_parts(frame_buffer, 0, 0, frame_delay);
+        encoder.encode_frame(gif_frame)?;
     }
 
+    drop(encoder);
     Ok(output_path)
 }
 
