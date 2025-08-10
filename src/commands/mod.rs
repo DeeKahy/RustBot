@@ -6,6 +6,7 @@ pub mod general;
 pub mod hangman;
 pub mod hello;
 pub mod help;
+pub mod hit;
 pub mod invite;
 pub mod kys;
 pub mod number_guess;
@@ -20,7 +21,6 @@ pub mod status;
 pub mod tictactoe;
 pub mod update;
 pub mod uwu;
-pub mod yeet;
 pub mod yourmom;
 
 // Re-export all commands for easy access from main.rs
@@ -30,6 +30,7 @@ pub use dice::dice;
 pub use hangman::{endhangman, hangman, hangmanhint, hangmanstatus, letter};
 pub use hello::hello;
 pub use help::help;
+pub use hit::hit;
 pub use invite::invite;
 pub use kys::kys;
 pub use number_guess::{endgame, gamestatus, guess, hint, numberguess};
@@ -44,7 +45,6 @@ pub use status::status;
 pub use tictactoe::{board, endttt, move_ttt, tictactoe};
 pub use update::update;
 pub use uwu::uwu;
-pub use yeet::yeet;
 pub use yourmom::yourmom;
 
 // You can add more command modules here as needed

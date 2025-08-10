@@ -5,9 +5,9 @@ use std::fs;
 use std::io::Cursor;
 use tempfile::NamedTempFile;
 
-/// Yeets a user by putting their profile picture on the yeet GIF
+/// Orders a hit on a user by putting their profile picture on the hit GIF
 #[poise::command(prefix_command, slash_command)]
-pub async fn yeet(
+pub async fn hit(
     ctx: Context<'_>,
     #[description = "User to call a hit on"] user: Option<serenity::User>,
 ) -> Result<(), Error> {
@@ -16,7 +16,7 @@ pub async fn yeet(
     let target_user = user.unwrap_or_else(|| ctx.author().clone());
 
     // Send initial "thinking" message
-    let thinking_msg = ctx.say("Loading the gun...").await?;
+    let thinking_msg = ctx.say("Aquireing the target...").await?;
 
     // Get the user's avatar URL
     let avatar_url = target_user
@@ -31,7 +31,7 @@ pub async fn yeet(
                 .edit(
                     ctx,
                     poise::CreateReply::default()
-                        .content(format!("❌ Failed to download profile picture: {}", e)),
+                        .content(format!("❌ Failed to identify target: {}", e)),
                 )
                 .await?;
             return Ok(());
@@ -45,7 +45,7 @@ pub async fn yeet(
                 .edit(
                     ctx,
                     poise::CreateReply::default()
-                        .content(format!("❌ Failed to read profile picture data: {}", e)),
+                        .content(format!("❌ Target intel corrupted: {}", e)),
                 )
                 .await?;
             return Ok(());
@@ -60,7 +60,7 @@ pub async fn yeet(
                 .edit(
                     ctx,
                     poise::CreateReply::default()
-                        .content(format!("❌ Failed to process profile picture: {}", e)),
+                        .content(format!("❌ Failed to process target photo: {}", e)),
                 )
                 .await?;
             return Ok(());
@@ -71,18 +71,18 @@ pub async fn yeet(
     thinking_msg
         .edit(
             ctx,
-            poise::CreateReply::default().content("Aiming..."),
+            poise::CreateReply::default().content("Getting in position..."),
         )
         .await?;
 
     // Process the GIF with the profile picture overlay
-    match process_yeet_gif(&avatar_img, &target_user.name).await {
+    match process_hit_gif(&avatar_img, &target_user.name).await {
         Ok(output_path) => {
             // Update status
             thinking_msg
                 .edit(
                     ctx,
-                    poise::CreateReply::default().content("Firing!"),
+                    poise::CreateReply::default().content("Aiming!"),
                 )
                 .await?;
 
@@ -94,7 +94,7 @@ pub async fn yeet(
                         .edit(
                             ctx,
                             poise::CreateReply::default()
-                                .content(format!("❌ Failed to read processed GIF: {}", e)),
+                                .content(format!("❌ Failed to retrieve evidence: {}", e)),
                         )
                         .await?;
                     return Ok(());
@@ -102,10 +102,13 @@ pub async fn yeet(
             };
 
             // Send the GIF
-            let attachment = serenity::CreateAttachment::bytes(gif_data, "yeet.gif");
+            let attachment = serenity::CreateAttachment::bytes(gif_data, "hit.gif");
 
             let reply = poise::CreateReply::default()
-                .content(format!("{} successfully assassinated!", target_user.name))
+                .content(format!(
+                    "Target {} has been eliminated! Contract completed successfully.",
+                    target_user.name
+                ))
                 .attachment(attachment);
 
             thinking_msg.edit(ctx, reply).await?;
@@ -117,8 +120,7 @@ pub async fn yeet(
             thinking_msg
                 .edit(
                     ctx,
-                    poise::CreateReply::default()
-                        .content(format!("❌ Failed to process yeet GIF: {}", e)),
+                    poise::CreateReply::default().content(format!("❌ Contract failed: {}", e)),
                 )
                 .await?;
         }
@@ -127,12 +129,12 @@ pub async fn yeet(
     Ok(())
 }
 
-async fn process_yeet_gif(
+async fn process_hit_gif(
     avatar_img: &DynamicImage,
     _user_name: &str,
 ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-    // Load the original yeet GIF
-    let gif_path = "assets/yeet.gif";
+    // Load the original hit GIF
+    let gif_path = "assets/hit.gif";
     let gif_data = fs::read(gif_path)?;
 
     // Decode the GIF
@@ -257,9 +259,9 @@ async fn process_yeet_gif(
 #[cfg(test)]
 mod tests {
     #[test]
-    fn test_yeet_command_exists() {
+    fn test_hit_command_exists() {
         // Basic test to ensure the command function exists
-        let function_name = "yeet";
-        assert_eq!(function_name.len(), 4);
+        let function_name = "hit";
+        assert_eq!(function_name.len(), 3);
     }
 }
