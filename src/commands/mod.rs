@@ -1,4 +1,5 @@
 // Commands module - imports all individual command files
+pub mod bonk;
 pub mod cleanup;
 pub mod coinflip;
 pub mod dice;
@@ -24,6 +25,7 @@ pub mod uwu;
 pub mod yourmom;
 
 // Re-export all commands for easy access from main.rs
+pub use bonk::bonk;
 pub use cleanup::cleanup;
 pub use coinflip::coinflip;
 pub use dice::dice;

@@ -9,7 +9,7 @@ mod commands;
 mod utils;
 
 use commands::{
-    board, cleanup, coinflip, dice, endgame, endhangman, endttt, gamestatus, guess, hangman,
+    board, bonk, cleanup, coinflip, dice, endgame, endhangman, endttt, gamestatus, guess, hangman,
     hangmanhint, hangmanstatus, hello, help, hint, hit, invite, kys, letter, move_ttt, numberguess,
     pfp, ping, poll, react, remind, spamping, start_reminder_checker, stats, status, tictactoe,
     update, uwu, yourmom,
@@ -89,6 +89,7 @@ async fn main() {
                 remind(),
                 react(),
                 hit(),
+                bonk(),
                 // Game commands
                 numberguess(),
                 guess(),
