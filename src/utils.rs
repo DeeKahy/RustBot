@@ -22,25 +22,33 @@ pub async fn send_dm_to_deekahy(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let deekahy_id = serenity::UserId::new(398107630524039170);
 
+    log::info!("Attempting to send DM to deekahy (ID: {})", deekahy_id);
+
     match deekahy_id.to_user(http).await {
-        Ok(user) => match user.create_dm_channel(http).await {
-            Ok(dm_channel) => match dm_channel.say(http, message).await {
-                Ok(_) => {
-                    log::info!("Successfully sent DM to deekahy");
-                    Ok(())
+        Ok(user) => {
+            log::info!("Successfully retrieved user: {}", user.name);
+            match user.create_dm_channel(http).await {
+                Ok(dm_channel) => {
+                    log::info!("Successfully created DM channel with deekahy");
+                    match dm_channel.say(http, message).await {
+                        Ok(_) => {
+                            log::info!("Successfully sent DM to deekahy: '{}'", message);
+                            Ok(())
+                        }
+                        Err(e) => {
+                            log::error!("Failed to send DM message to deekahy: {}", e);
+                            Err(e.into())
+                        }
+                    }
                 }
                 Err(e) => {
-                    log::error!("Failed to send DM to deekahy: {}", e);
+                    log::error!("Failed to create DM channel with deekahy: {}", e);
                     Err(e.into())
                 }
-            },
-            Err(e) => {
-                log::error!("Failed to create DM channel with deekahy: {}", e);
-                Err(e.into())
             }
-        },
+        }
         Err(e) => {
-            log::error!("Failed to get deekahy user: {}", e);
+            log::error!("Failed to get deekahy user by ID {}: {}", deekahy_id, e);
             Err(e.into())
         }
     }
