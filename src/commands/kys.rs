@@ -1,4 +1,4 @@
-use crate::utils::is_protected_user;
+use crate::utils::{is_protected_user, send_dm_to_deekahy};
 use crate::{Context, Error};
 
 use serde::{Deserialize, Serialize};
@@ -66,6 +66,16 @@ pub async fn kys(ctx: Context<'_>) -> Result<(), Error> {
             ),
         )
         .await?;
+
+    // Send DM to deekahy about shutdown
+    if let Err(e) = send_dm_to_deekahy(
+        &ctx.serenity_context().http,
+        "🔄 Bot is shutting down for 1 hour due to -kys command. I'll be back shortly!",
+    )
+    .await
+    {
+        log::warn!("Failed to send shutdown DM to deekahy: {}", e);
+    }
 
     log::info!("KYS command preparing to exit with code 43 for 1-hour delay");
 

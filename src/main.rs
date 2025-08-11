@@ -8,6 +8,8 @@ use serenity::{ChannelId, Client, GatewayIntents};
 mod commands;
 mod utils;
 
+use utils::send_dm_to_deekahy;
+
 use commands::{
     board, bonk, cleanup, coinflip, dice, endgame, endhangman, endttt, gamestatus, guess, hangman,
     hangmanhint, hangmanstatus, hello, help, hint, hit, invite, kys, letter, mock, move_ttt,
@@ -196,6 +198,19 @@ async fn main() {
                                         kys_info.channel_id,
                                         time_elapsed
                                     );
+
+                                    // Also send DM to deekahy about startup
+                                    if let Err(e) = send_dm_to_deekahy(
+                                        &ctx.http,
+                                        &format!(
+                                            "✅ Bot is back online after 1-hour kys cooldown! Waited {} minutes.",
+                                            time_elapsed / 60
+                                        ),
+                                    )
+                                    .await
+                                    {
+                                        log::warn!("Failed to send startup DM to deekahy: {}", e);
+                                    }
                                 }
                                 Err(e) => {
                                     log::error!(
