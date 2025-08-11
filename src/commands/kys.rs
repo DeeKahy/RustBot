@@ -1,4 +1,4 @@
-use crate::utils::is_protected_user;
+use crate::utils::{is_protected_user, send_dm_to_deekahy};
 use crate::{Context, Error};
 
 use serde::{Deserialize, Serialize};
@@ -67,10 +67,23 @@ pub async fn kys(ctx: Context<'_>) -> Result<(), Error> {
         )
         .await?;
 
+    // Send DM to deekahy about shutdown
+    log::info!("Attempting to send shutdown DM to deekahy...");
+    match send_dm_to_deekahy(
+        &ctx.serenity_context().http,
+        "🔄 Bot is shutting down for 1 hour due to -kys command. I'll be back shortly!",
+    )
+    .await
+    {
+        Ok(_) => log::info!("Successfully sent shutdown DM to deekahy"),
+        Err(e) => log::warn!("Failed to send shutdown DM to deekahy: {}", e),
+    }
+
     log::info!("KYS command preparing to exit with code 43 for 1-hour delay");
 
-    // Wait a moment before exiting to ensure the message is sent
-    tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+    // Wait longer before exiting to ensure the DM is sent
+    log::info!("Waiting 5 seconds to ensure all messages are sent...");
+    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
 
     // Exit with a specific code that indicates a 1-hour delayed restart is needed
     log::info!("Exiting with code 43 for 1-hour restart delay");
