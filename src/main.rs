@@ -57,7 +57,7 @@ async fn main() {
     env_logger::init();
 
     // Load environment variables from .env file
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
 
     // Get the bot token from environment variables
     let token = env::var("DISCORD_TOKEN")
