@@ -59,12 +59,29 @@ pub async fn spamping(
             return Ok(());
         }
 
-        // Confirm to the user who started it
-        ctx.say(format!(
-            "Spam ping started for {} in {}! They will be pinged every 10 seconds until they respond.",
-            user.mention(),
-            thread.mention()
-        )).await?;
+        // Try to delete the command message that triggered this
+        if let poise::Context::Prefix(prefix_ctx) = ctx {
+            let _ = prefix_ctx.msg.delete(&ctx.serenity_context().http).await;
+        }
+
+        // Get recent messages to find and delete the thread creation message
+        if let Ok(messages) = ctx
+            .channel_id()
+            .messages(
+                &ctx.serenity_context().http,
+                serenity::GetMessages::new().limit(5),
+            )
+            .await
+        {
+            for message in messages {
+                if message.kind == serenity::MessageType::ThreadCreated
+                    && message.content.contains(&format!("Spamping {}", user.name))
+                {
+                    let _ = message.delete(&ctx.serenity_context().http).await;
+                    break;
+                }
+            }
+        }
 
         // Clone necessary data for the spawned task
         let http = ctx.serenity_context().http.clone();
