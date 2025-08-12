@@ -94,9 +94,15 @@ pub async fn spamping(
                         let _ = thread_id
                             .say(
                                 &http,
-                                format!("{user_mention} responded! Spam ping stopped after {ping_count} pings."),
+                                format!("{user_mention} responded! Spam ping stopped after {ping_count} pings. Thread will be deleted in 5 seconds..."),
                             )
                             .await;
+
+                        // Wait 5 seconds to let people see the final message
+                        sleep(Duration::from_secs(5)).await;
+
+                        // Delete the thread
+                        let _ = thread_id.delete(&http, None).await;
                         break;
                     }
                 }
