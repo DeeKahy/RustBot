@@ -59,32 +59,15 @@ pub async fn spamping(
             return Ok(());
         }
 
-        // Try to delete the command message that triggered this
-        if let poise::Context::Prefix(prefix_ctx) = ctx {
-            let _ = prefix_ctx.msg.delete(&ctx.serenity_context().http).await;
-        }
-
-        // Get recent messages to find and delete the thread creation message
-        if let Ok(messages) = ctx
-            .channel_id()
-            .messages(
-                &ctx.serenity_context().http,
-                serenity::GetMessages::new().limit(5),
-            )
-            .await
-        {
-            for message in messages {
-                if message.kind == serenity::MessageType::ThreadCreated
-                    && message.content.contains(&format!("Spamping {}", user.name))
-                {
-                    let _ = message.delete(&ctx.serenity_context().http).await;
-                    break;
-                }
-            }
-        }
-
         // Clone necessary data for the spawned task
         let http = ctx.serenity_context().http.clone();
+        let channel_id = ctx.channel_id();
+
+        // Store command message info for deletion later
+        let command_msg_id = match ctx {
+            poise::Context::Prefix(prefix_ctx) => Some(prefix_ctx.msg.id),
+            _ => None,
+        };
         let thread_id = thread.id;
         let user_id = user.id;
         let user_mention = user.mention().to_string();
@@ -120,6 +103,26 @@ pub async fn spamping(
 
                         // Delete the thread
                         let _ = thread_id.delete(&http).await;
+
+                        // Clean up leftover messages in the original channel
+                        if let Some(cmd_msg_id) = command_msg_id {
+                            let _ = channel_id.delete_message(&http, cmd_msg_id).await;
+                        }
+
+                        // Find and delete the thread creation message
+                        if let Ok(messages) = channel_id
+                            .messages(&http, serenity::GetMessages::new().limit(10))
+                            .await
+                        {
+                            for message in messages {
+                                if message.kind == serenity::MessageType::ThreadCreated
+                                    && message.content.contains(&format!("Spamping {}", user.name))
+                                {
+                                    let _ = message.delete(&http).await;
+                                    break;
+                                }
+                            }
+                        }
                         break;
                     }
                 }
