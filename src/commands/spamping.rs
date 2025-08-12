@@ -102,7 +102,7 @@ pub async fn spamping(
                         sleep(Duration::from_secs(5)).await;
 
                         // Delete the thread
-                        let _ = thread_id.delete(&http, None).await;
+                        let _ = thread_id.delete(&http).await;
                         break;
                     }
                 }
