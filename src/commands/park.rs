@@ -219,13 +219,13 @@ pub async fn park_now(
                     serde_json::from_str::<serde_json::Value>(&response_text)
                 {
                     format!(
-                        "✅ **Parking confirmed!**\n🚗 **Plate:** {}\n📱 **Phone:** +45{}\n⏱️ **Duration:** 10 minutes\n📍 **Area:** ADK-4688\n\n💾 *Your information has been saved for next time*",
+                        "✅ **Parking confirmed!**\n🚗 **Plate:** {}\n📱 **Phone:** +45 {}\n⏱️ **Duration:** 10 hours. Validate that you got an SMS with the correct information.\n📍 **Area:** ADK-4688\n\n💾 *Your information has been saved for next time*",
                         final_plate,
                         final_phone
                     )
                 } else {
                     format!(
-                        "✅ **Parking request sent!**\n🚗 **Plate:** {}\n📱 **Phone:** +45{}\n⏱️ **Duration:** 10 minutes\n\n💾 *Your information has been saved for next time*",
+                        "✅ **Parking request sent!**\n🚗 **Plate:** {}\n📱 **Phone:** +45 {}\n⏱️ **Duration:** 10 hours\n\n💾 *Your information has been saved for next time*",
                         final_plate,
                         final_phone
                     )
