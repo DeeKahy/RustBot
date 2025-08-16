@@ -1,0 +1,54 @@
+version: "3.8"
+
+services:
+  rustbot:
+    # Use lightweight GitHub-cloning image
+    image: ghcr.io/deekahy/rustbot:latest
+
+    container_name: rustbot
+    restart: unless-stopped
+
+    # Environment variables - these will be overridden by CasaOS
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN:-}
+      - RUST_LOG=${RUST_LOG:-info}
+      - RUST_BACKTRACE=${RUST_BACKTRACE:-1}
+      - PROTECTED_USERS=${PROTECTED_USERS:-deekahy}
+      - GIT_BRANCH=${GIT_BRANCH:-developing}
+
+    # Resource limits (higher for compilation)
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+        reservations:
+          memory: 512M
+          cpus: "0.2"
+
+    # Health check to monitor bot status
+    healthcheck:
+      test: ["CMD", "pgrep", "rustbot"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Security options (removed read_only for git operations)
+    security_opt:
+      - no-new-privileges:true
+
+    # Networks
+    networks:
+      - rustbot-network
+
+networks:
+  rustbot-network:
+    driver: bridge
