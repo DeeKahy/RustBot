@@ -301,7 +301,7 @@ fn create_parking_payload(plate: &str, phone: &str) -> serde_json::Value {
                 "ParkingAreaKey": "ADK-4688"
             }
         ],
-        "UId": generate_unique_request_id(),
+        "UId": "12cdf204-d969-469a-9bd5-c1f1fc59ee34",
         "Lang": "da"
     })
 }
