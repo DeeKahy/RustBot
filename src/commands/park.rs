@@ -138,7 +138,13 @@ fn is_valid_time(hour: u8, minute: u8) -> bool {
 fn is_weekday(datetime: &DateTime<chrono_tz::Tz>) -> bool {
     matches!(
         datetime.weekday(),
-        Weekday::Mon | Weekday::Tue | Weekday::Wed | Weekday::Thu | Weekday::Fri | Weekday::Sat | Weekday::Sun
+        Weekday::Mon
+            | Weekday::Tue
+            | Weekday::Wed
+            | Weekday::Thu
+            | Weekday::Fri
+            | Weekday::Sat
+            | Weekday::Sun
     )
 }
 
@@ -147,7 +153,7 @@ fn is_schedule_time_match(
     current_time: &DateTime<chrono_tz::Tz>,
 ) -> bool {
     let time_diff = (*current_time - *schedule_time).num_seconds().abs();
-    time_diff <= 30 // Within 30 seconds
+    time_diff <= 1800 // Within 30 minutes (1800 seconds)
 }
 
 // Rate limiting
