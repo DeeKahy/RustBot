@@ -13,8 +13,8 @@ use utils::send_dm_to_deekahy;
 use commands::{
     board, bonk, cleanup, coinflip, dice, endgame, endhangman, endttt, gamestatus, guess, hangman,
     hangmanhint, hangmanstatus, hello, help, hint, hit, invite, kys, letter, mock, move_ttt,
-    numberguess, park, pfp, ping, poll, react, remind, spamping, start_reminder_checker, stats,
-    status, tictactoe, update, uwu, yourmom,
+    numberguess, park, pfp, ping, poll, react, remind, spamping, start_parking_scheduler,
+    start_reminder_checker, stats, status, tictactoe, update, uwu, yourmom,
 };
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -259,6 +259,10 @@ async fn main() {
                 // Start reminder checker background task
                 start_reminder_checker(ctx.http.clone());
                 log::info!("Reminder checker started");
+
+                // Start parking scheduler background task
+                start_parking_scheduler(ctx.http.clone());
+                log::info!("Parking scheduler started");
 
                 Ok(Data {})
             })
