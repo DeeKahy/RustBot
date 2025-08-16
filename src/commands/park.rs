@@ -66,14 +66,21 @@ pub async fn park_now(
         (Some(p), Some(ph)) => {
             // Validate phone number (should be digits only)
             if !ph.chars().all(|c| c.is_ascii_digit()) {
-                ctx.say("❌ Phone number should contain only digits (no spaces, dashes, or country code)")
+                ctx.send(poise::CreateReply::default()
+                    .content("❌ Phone number should contain only digits (no spaces, dashes, or country code)")
+                    .ephemeral(true))
                     .await?;
                 return Ok(());
             }
 
             // Validate plate (basic validation - not empty and reasonable length)
             if p.trim().is_empty() || p.len() > 10 {
-                ctx.say("❌ Invalid license plate format").await?;
+                ctx.send(
+                    poise::CreateReply::default()
+                        .content("❌ Invalid license plate format")
+                        .ephemeral(true),
+                )
+                .await?;
                 return Ok(());
             }
 
@@ -92,7 +99,12 @@ pub async fn park_now(
         // Only plate provided - use stored phone if available
         (Some(p), None) => {
             if p.trim().is_empty() || p.len() > 10 {
-                ctx.say("❌ Invalid license plate format").await?;
+                ctx.send(
+                    poise::CreateReply::default()
+                        .content("❌ Invalid license plate format")
+                        .ephemeral(true),
+                )
+                .await?;
                 return Ok(());
             }
 
@@ -109,7 +121,9 @@ pub async fn park_now(
                     (p.to_uppercase(), phone_number)
                 }
                 None => {
-                    ctx.say("❌ I don't remember your phone number. Please provide both plate and phone number for the first time.")
+                    ctx.send(poise::CreateReply::default()
+                        .content("❌ I don't remember your phone number. Please provide both plate and phone number for the first time.")
+                        .ephemeral(true))
                         .await?;
                     return Ok(());
                 }
@@ -118,7 +132,9 @@ pub async fn park_now(
         // Only phone provided - use stored plate if available
         (None, Some(ph)) => {
             if !ph.chars().all(|c| c.is_ascii_digit()) {
-                ctx.say("❌ Phone number should contain only digits (no spaces, dashes, or country code)")
+                ctx.send(poise::CreateReply::default()
+                    .content("❌ Phone number should contain only digits (no spaces, dashes, or country code)")
+                    .ephemeral(true))
                     .await?;
                 return Ok(());
             }
@@ -136,7 +152,9 @@ pub async fn park_now(
                     (plate, ph)
                 }
                 None => {
-                    ctx.say("❌ I don't remember your license plate. Please provide both plate and phone number for the first time.")
+                    ctx.send(poise::CreateReply::default()
+                        .content("❌ I don't remember your license plate. Please provide both plate and phone number for the first time.")
+                        .ephemeral(true))
                         .await?;
                     return Ok(());
                 }
@@ -146,15 +164,23 @@ pub async fn park_now(
         (None, None) => match data.users.get(&user_id) {
             Some(stored_info) => (stored_info.plate.clone(), stored_info.phone_number.clone()),
             None => {
-                ctx.say("❌ I don't remember your information. Please provide both your license plate and phone number.")
-                        .await?;
+                ctx.send(poise::CreateReply::default()
+                    .content("❌ I don't remember your information. Please provide both your license plate and phone number.")
+                    .ephemeral(true))
+                    .await?;
                 return Ok(());
             }
         },
     };
 
     // Send initial response
-    let initial_reply = ctx.say("🚗 Processing parking request...").await?;
+    let initial_reply = ctx
+        .send(
+            poise::CreateReply::default()
+                .content("🚗 Processing parking request...")
+                .ephemeral(true),
+        )
+        .await?;
 
     // Create the HTTP client
     let client = Client::new();
@@ -206,7 +232,12 @@ pub async fn park_now(
                 };
 
                 initial_reply
-                    .edit(ctx, poise::CreateReply::default().content(success_message))
+                    .edit(
+                        ctx,
+                        poise::CreateReply::default()
+                            .content(success_message)
+                            .ephemeral(true),
+                    )
                     .await?;
 
                 log::info!(
@@ -227,7 +258,12 @@ pub async fn park_now(
                 );
 
                 initial_reply
-                    .edit(ctx, poise::CreateReply::default().content(error_message))
+                    .edit(
+                        ctx,
+                        poise::CreateReply::default()
+                            .content(error_message)
+                            .ephemeral(true),
+                    )
                     .await?;
 
                 log::error!(
@@ -242,7 +278,12 @@ pub async fn park_now(
             let error_message = format!("❌ **Network error occurred**\n**Error:** {}", e);
 
             initial_reply
-                .edit(ctx, poise::CreateReply::default().content(error_message))
+                .edit(
+                    ctx,
+                    poise::CreateReply::default()
+                        .content(error_message)
+                        .ephemeral(true),
+                )
                 .await?;
 
             log::error!(
@@ -271,10 +312,17 @@ pub async fn park_info(ctx: Context<'_>) -> Result<(), Error> {
                 info.plate,
                 info.phone_number
             );
-            ctx.say(message).await?;
+            ctx.send(
+                poise::CreateReply::default()
+                    .content(message)
+                    .ephemeral(true),
+            )
+            .await?;
         }
         None => {
-            ctx.say("📭 No parking information saved. Use `/park now <plate> <phone>` to save your info.")
+            ctx.send(poise::CreateReply::default()
+                .content("📭 No parking information saved. Use `/park now <plate> <phone>` to save your info.")
+                .ephemeral(true))
                 .await?;
         }
     }
@@ -292,16 +340,28 @@ pub async fn park_clear(ctx: Context<'_>) -> Result<(), Error> {
 
     if data.users.remove(&user_id).is_some() {
         if let Err(e) = save_parking_data(&data) {
-            ctx.say(format!("❌ Failed to clear data: {}", e)).await?;
+            ctx.send(
+                poise::CreateReply::default()
+                    .content(format!("❌ Failed to clear data: {}", e))
+                    .ephemeral(true),
+            )
+            .await?;
             return Ok(());
         }
 
-        ctx.say("🗑️ **Parking information cleared**\nYour saved plate and phone number have been removed.")
+        ctx.send(poise::CreateReply::default()
+            .content("🗑️ **Parking information cleared**\nYour saved plate and phone number have been removed.")
+            .ephemeral(true))
             .await?;
 
         log::info!("Cleared parking data for user {}", ctx.author().name);
     } else {
-        ctx.say("📭 No parking information found to clear.").await?;
+        ctx.send(
+            poise::CreateReply::default()
+                .content("📭 No parking information found to clear.")
+                .ephemeral(true),
+        )
+        .await?;
     }
 
     Ok(())
