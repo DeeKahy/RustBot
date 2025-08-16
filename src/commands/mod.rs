@@ -39,7 +39,7 @@ pub use invite::invite;
 pub use kys::kys;
 pub use mock::mock;
 pub use number_guess::{endgame, gamestatus, guess, hint, numberguess};
-pub use park::park;
+pub use park::{park, start_parking_scheduler};
 pub use pfp::pfp;
 pub use ping::ping;
 pub use poll::poll;
