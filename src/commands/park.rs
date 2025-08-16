@@ -138,7 +138,7 @@ fn is_valid_time(hour: u8, minute: u8) -> bool {
 fn is_weekday(datetime: &DateTime<chrono_tz::Tz>) -> bool {
     matches!(
         datetime.weekday(),
-        Weekday::Mon | Weekday::Tue | Weekday::Wed | Weekday::Thu | Weekday::Fri
+        Weekday::Mon | Weekday::Tue | Weekday::Wed | Weekday::Thu | Weekday::Fri | Weekday::Sat | Weekday::Sun
     )
 }
 
