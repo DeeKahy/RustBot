@@ -23,7 +23,6 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 use tokio::time::{interval, Duration as TokioDuration};
-use uuid::Uuid;
 
 // Rate limiter: 3 requests per user per hour for parking
 type ParkingRateLimiter = RateLimiter<NotKeyed, InMemoryState, DefaultClock>;
@@ -290,7 +289,9 @@ fn cleanup_old_missed_requests(requests: &mut Vec<DateTime<Utc>>, now: DateTime<
     requests.retain(|&req_time| req_time.date_naive() >= today);
 }
 
+#[cfg(test)]
 fn generate_unique_request_id() -> String {
+    use uuid::Uuid;
     Uuid::new_v4().to_string()
 }
 
@@ -1330,6 +1331,8 @@ mod tests {
 
     #[test]
     fn test_uid_generation() {
+        use uuid::Uuid;
+
         let uid1 = generate_unique_request_id();
         let uid2 = generate_unique_request_id();
 
@@ -1337,8 +1340,8 @@ mod tests {
         assert_ne!(uid1, uid2);
 
         // UIDs should be valid UUID format
-        assert!(uuid::Uuid::parse_str(&uid1).is_ok());
-        assert!(uuid::Uuid::parse_str(&uid2).is_ok());
+        assert!(Uuid::parse_str(&uid1).is_ok());
+        assert!(Uuid::parse_str(&uid2).is_ok());
     }
 
     #[test]
