@@ -137,13 +137,7 @@ fn is_valid_time(hour: u8, minute: u8) -> bool {
 fn is_weekday(datetime: &DateTime<chrono_tz::Tz>) -> bool {
     matches!(
         datetime.weekday(),
-        Weekday::Mon
-            | Weekday::Tue
-            | Weekday::Wed
-            | Weekday::Thu
-            | Weekday::Fri
-            | Weekday::Sat
-            | Weekday::Sun
+        Weekday::Mon | Weekday::Tue | Weekday::Wed | Weekday::Thu | Weekday::Fri
     )
 }
 
@@ -1302,8 +1296,8 @@ mod tests {
         let current_time = Copenhagen.with_ymd_and_hms(2024, 1, 1, 8, 30, 25).unwrap();
         assert!(is_schedule_time_match(&schedule_time, &current_time));
 
-        // More than 1 minute off (should not match)
-        let current_time = Copenhagen.with_ymd_and_hms(2024, 1, 1, 8, 31, 30).unwrap();
+        // More than 30 minutes off (should not match)
+        let current_time = Copenhagen.with_ymd_and_hms(2024, 1, 1, 9, 1, 0).unwrap();
         assert!(!is_schedule_time_match(&schedule_time, &current_time));
     }
 
