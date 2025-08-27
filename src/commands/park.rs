@@ -1361,4 +1361,343 @@ mod tests {
         assert_eq!(areas[0]["ParkingAreaId"], 1956);
         assert_eq!(areas[0]["ParkingAreaKey"], "ADK-4688");
     }
+
+    #[test]
+    fn test_data_migration_from_unencrypted() {
+        // Create a temporary file with old format (unencrypted) data
+        let old_format_json = r#"{
+            "users": {
+                "123456789": {
+                    "phone_number": "12345678",
+                    "plate": "AB12345"
+                }
+            },
+            "schedules": {
+                "123456789": {
+                    "user_id": 123456789,
+                    "hour": 8,
+                    "minute": 30,
+                    "enabled": true,
+                    "last_parked": null,
+                    "missed_requests": []
+                }
+            }
+        }"#;
+
+        // Test that we can parse old format data
+        let parsed: Result<ParkingData, _> = serde_json::from_str(old_format_json);
+        assert!(parsed.is_ok());
+
+        let mut data = parsed.unwrap();
+
+        // Verify the data was parsed correctly
+        assert_eq!(data.users.len(), 1);
+        assert_eq!(data.schedules.len(), 1);
+        assert!(data.encryption_key.is_none()); // Old format doesn't have encryption key
+
+        let user_info = data.users.get(&123456789).unwrap();
+        assert_eq!(user_info.phone_number, "12345678"); // Should be plain text
+        assert_eq!(user_info.plate, "AB12345");
+
+        // Simulate what happens during load_parking_data migration
+        let encryption_key = generate_encryption_key();
+
+        // Try to decrypt the data (should fail gracefully for unencrypted data)
+        for user_info in data.users.values_mut() {
+            // This should fail because the data is not encrypted
+            if let Ok(decrypted_phone) = decrypt_data(&user_info.phone_number, &encryption_key) {
+                user_info.phone_number = decrypted_phone;
+            }
+            // Phone number should remain unchanged because decryption failed
+            assert_eq!(user_info.phone_number, "12345678");
+
+            if let Ok(decrypted_plate) = decrypt_data(&user_info.plate, &encryption_key) {
+                user_info.plate = decrypted_plate;
+            }
+            // Plate should remain unchanged because decryption failed
+            assert_eq!(user_info.plate, "AB12345");
+        }
+
+        // Set encryption key (as done in load_parking_data)
+        data.encryption_key = Some(encryption_key);
+
+        // Now test that the data can be saved with encryption
+        let save_data = ParkingData {
+            users: {
+                let mut encrypted_users = HashMap::new();
+                for (user_id, user_info) in &data.users {
+                    let encryption_key = data.encryption_key.as_ref().unwrap();
+                    let encrypted_phone =
+                        encrypt_data(&user_info.phone_number, encryption_key).unwrap();
+                    let encrypted_plate = encrypt_data(&user_info.plate, encryption_key).unwrap();
+
+                    encrypted_users.insert(
+                        *user_id,
+                        UserParkingInfo {
+                            phone_number: encrypted_phone,
+                            plate: encrypted_plate,
+                        },
+                    );
+                }
+                encrypted_users
+            },
+            schedules: data.schedules.clone(),
+            encryption_key: None, // Not saved to JSON
+        };
+
+        // Verify we can serialize the encrypted data
+        let serialized = serde_json::to_string(&save_data);
+        assert!(serialized.is_ok());
+
+        // Verify encrypted data is different from original
+        let encrypted_user = save_data.users.get(&123456789).unwrap();
+        assert_ne!(encrypted_user.phone_number, "12345678");
+        assert_ne!(encrypted_user.plate, "AB12345");
+    }
+
+    #[test]
+    fn test_full_migration_cycle() {
+        // Test the complete migration cycle: old format -> load -> save -> load again
+        use std::fs;
+        use tempfile::NamedTempFile;
+
+        // Create old format JSON data (without encryption_key field)
+        let old_format_json = r#"{
+            "users": {
+                "987654321": {
+                    "phone_number": "87654321",
+                    "plate": "XY98765"
+                }
+            },
+            "schedules": {
+                "987654321": {
+                    "user_id": 987654321,
+                    "hour": 9,
+                    "minute": 15,
+                    "enabled": true,
+                    "last_parked": null,
+                    "missed_requests": []
+                }
+            }
+        }"#;
+
+        // Create a temporary file with old format data
+        let temp_file = NamedTempFile::new().unwrap();
+        fs::write(temp_file.path(), old_format_json).unwrap();
+
+        // Simulate loading old format data (this is what happens in load_parking_data)
+        let content = fs::read_to_string(temp_file.path()).unwrap();
+        let mut data: ParkingData = serde_json::from_str(&content).unwrap();
+
+        // Verify old data loaded correctly
+        assert!(data.encryption_key.is_none());
+        let user_info = data.users.get(&987654321).unwrap();
+        assert_eq!(user_info.phone_number, "87654321");
+        assert_eq!(user_info.plate, "XY98765");
+
+        // Simulate the encryption key setup and migration attempt
+        let encryption_key = generate_encryption_key();
+
+        // Try to decrypt (should fail silently for unencrypted data)
+        for user_info in data.users.values_mut() {
+            if let Ok(decrypted_phone) = decrypt_data(&user_info.phone_number, &encryption_key) {
+                user_info.phone_number = decrypted_phone;
+            }
+            if let Ok(decrypted_plate) = decrypt_data(&user_info.plate, &encryption_key) {
+                user_info.plate = decrypted_plate;
+            }
+        }
+
+        // Data should remain unchanged (decryption failed)
+        let user_info = data.users.get(&987654321).unwrap();
+        assert_eq!(user_info.phone_number, "87654321");
+        assert_eq!(user_info.plate, "XY98765");
+
+        // Set encryption key
+        data.encryption_key = Some(encryption_key.clone());
+
+        // Now simulate saving (this should encrypt the data)
+        let mut save_data = ParkingData {
+            users: HashMap::new(),
+            schedules: data.schedules.clone(),
+            encryption_key: None,
+        };
+
+        // Encrypt user data for saving
+        for (user_id, user_info) in &data.users {
+            let encrypted_phone = encrypt_data(&user_info.phone_number, &encryption_key).unwrap();
+            let encrypted_plate = encrypt_data(&user_info.plate, &encryption_key).unwrap();
+
+            save_data.users.insert(
+                *user_id,
+                UserParkingInfo {
+                    phone_number: encrypted_phone,
+                    plate: encrypted_plate,
+                },
+            );
+        }
+
+        // Save encrypted data to file
+        let encrypted_json = serde_json::to_string_pretty(&save_data).unwrap();
+        let encrypted_file = NamedTempFile::new().unwrap();
+        fs::write(encrypted_file.path(), encrypted_json).unwrap();
+
+        // Now load the encrypted data and verify it decrypts correctly
+        let encrypted_content = fs::read_to_string(encrypted_file.path()).unwrap();
+        let mut loaded_data: ParkingData = serde_json::from_str(&encrypted_content).unwrap();
+
+        // Set encryption key for decryption
+        loaded_data.encryption_key = Some(encryption_key.clone());
+
+        // Decrypt the loaded data
+        for user_info in loaded_data.users.values_mut() {
+            if let Ok(decrypted_phone) = decrypt_data(&user_info.phone_number, &encryption_key) {
+                user_info.phone_number = decrypted_phone;
+            }
+            if let Ok(decrypted_plate) = decrypt_data(&user_info.plate, &encryption_key) {
+                user_info.plate = decrypted_plate;
+            }
+        }
+
+        // Verify the decrypted data matches the original
+        let final_user_info = loaded_data.users.get(&987654321).unwrap();
+        assert_eq!(final_user_info.phone_number, "87654321");
+        assert_eq!(final_user_info.plate, "XY98765");
+    }
+
+    #[test]
+    fn test_load_parking_data_migration_simulation() {
+        use std::fs;
+
+        use tempfile::NamedTempFile;
+
+        // Create old format JSON data without encryption_key field
+        let old_format_json = r#"{
+            "users": {
+                "111222333": {
+                    "phone_number": "11223344",
+                    "plate": "OLD1234"
+                },
+                "444555666": {
+                    "phone_number": "55667788",
+                    "plate": "TEST987"
+                }
+            },
+            "schedules": {
+                "111222333": {
+                    "user_id": 111222333,
+                    "hour": 7,
+                    "minute": 45,
+                    "enabled": true,
+                    "last_parked": null,
+                    "missed_requests": []
+                }
+            }
+        }"#;
+
+        // Write old format to temporary file
+        let temp_file = NamedTempFile::new().unwrap();
+        fs::write(temp_file.path(), old_format_json).unwrap();
+
+        // Simulate the load_parking_data function logic
+        let encryption_key = generate_encryption_key();
+
+        let mut data = if temp_file.path().exists() {
+            match fs::read_to_string(temp_file.path()) {
+                Ok(content) => {
+                    match serde_json::from_str::<ParkingData>(&content) {
+                        Ok(mut parsed_data) => {
+                            // This is the migration logic from load_parking_data
+                            for user_info in parsed_data.users.values_mut() {
+                                if let Ok(decrypted_phone) =
+                                    decrypt_data(&user_info.phone_number, &encryption_key)
+                                {
+                                    user_info.phone_number = decrypted_phone;
+                                }
+                                if let Ok(decrypted_plate) =
+                                    decrypt_data(&user_info.plate, &encryption_key)
+                                {
+                                    user_info.plate = decrypted_plate;
+                                }
+                            }
+                            parsed_data
+                        }
+                        Err(_) => ParkingData::default(),
+                    }
+                }
+                Err(_) => ParkingData::default(),
+            }
+        } else {
+            ParkingData::default()
+        };
+
+        data.encryption_key = Some(encryption_key.clone());
+
+        // Verify that old unencrypted data was loaded correctly
+        assert_eq!(data.users.len(), 2);
+        assert_eq!(data.schedules.len(), 1);
+
+        let user1 = data.users.get(&111222333).unwrap();
+        assert_eq!(user1.phone_number, "11223344"); // Should remain unencrypted
+        assert_eq!(user1.plate, "OLD1234");
+
+        let user2 = data.users.get(&444555666).unwrap();
+        assert_eq!(user2.phone_number, "55667788");
+        assert_eq!(user2.plate, "TEST987");
+
+        // Simulate save_parking_data function
+        let mut save_data = ParkingData {
+            users: HashMap::new(),
+            schedules: data.schedules.clone(),
+            encryption_key: None,
+        };
+
+        // Encrypt user data before saving (save_parking_data logic)
+        for (user_id, user_info) in &data.users {
+            let encrypted_phone = encrypt_data(&user_info.phone_number, &encryption_key).unwrap();
+            let encrypted_plate = encrypt_data(&user_info.plate, &encryption_key).unwrap();
+
+            save_data.users.insert(
+                *user_id,
+                UserParkingInfo {
+                    phone_number: encrypted_phone,
+                    plate: encrypted_plate,
+                },
+            );
+        }
+
+        // Verify that data is encrypted for saving
+        let encrypted_user1 = save_data.users.get(&111222333).unwrap();
+        assert_ne!(encrypted_user1.phone_number, "11223344");
+        assert_ne!(encrypted_user1.plate, "OLD1234");
+
+        // Write encrypted data and verify it can be loaded again
+        let encrypted_json = serde_json::to_string_pretty(&save_data).unwrap();
+        let encrypted_file = NamedTempFile::new().unwrap();
+        fs::write(encrypted_file.path(), encrypted_json).unwrap();
+
+        // Load encrypted data again (simulate next startup)
+        let content = fs::read_to_string(encrypted_file.path()).unwrap();
+        let mut loaded_data: ParkingData = serde_json::from_str(&content).unwrap();
+        loaded_data.encryption_key = Some(encryption_key.clone());
+
+        // Decrypt loaded data
+        for user_info in loaded_data.users.values_mut() {
+            if let Ok(decrypted_phone) = decrypt_data(&user_info.phone_number, &encryption_key) {
+                user_info.phone_number = decrypted_phone;
+            }
+            if let Ok(decrypted_plate) = decrypt_data(&user_info.plate, &encryption_key) {
+                user_info.plate = decrypted_plate;
+            }
+        }
+
+        // Verify that the round-trip worked: old data -> encrypted -> decrypted
+        let final_user1 = loaded_data.users.get(&111222333).unwrap();
+        assert_eq!(final_user1.phone_number, "11223344");
+        assert_eq!(final_user1.plate, "OLD1234");
+
+        let final_user2 = loaded_data.users.get(&444555666).unwrap();
+        assert_eq!(final_user2.phone_number, "55667788");
+        assert_eq!(final_user2.plate, "TEST987");
+    }
 }
