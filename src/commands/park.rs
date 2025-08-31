@@ -309,7 +309,6 @@ fn create_parking_payload(plate: &str, phone: &str) -> serde_json::Value {
 
 /// Park your vehicle using mobile parking service
 #[poise::command(
-    prefix_command,
     slash_command,
     subcommands("park_now", "park_info", "park_clear", "park_schedule")
 )]
@@ -613,7 +612,6 @@ pub async fn park_clear(ctx: Context<'_>) -> Result<(), Error> {
 
 /// Schedule automatic parking for weekdays
 #[poise::command(
-    prefix_command,
     slash_command,
     rename = "schedule",
     subcommands("schedule_set", "schedule_status", "schedule_disable")
