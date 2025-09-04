@@ -282,9 +282,55 @@ RustBot/
 ## Environment Variables
 
 - `DISCORD_TOKEN` - Your Discord bot token (required)
+
 - `RUST_LOG` - Log level (optional, defaults to `info`)
 - `GIT_BRANCH` - Git branch to pull from during updates (optional, defaults to `main`)
 - `PROTECTED_USERS` - Space-separated list of usernames who can use protected commands like `-update`, `-cleanup`, and `-kys` (optional, defaults to `deekahy`)
+
+## Facebook Events Monitoring 📅
+
+The bot can monitor public Facebook pages for new events and automatically post them to Discord channels using web scraping techniques.
+
+### Setup
+
+**Configure Monitoring**:
+```
+/facebook_monitor pages:fklub,ADSLAAU
+```
+or
+```
+-facebook_monitor https://www.facebook.com/fklub,https://www.facebook.com/ADSLAAU
+```
+
+### Commands
+
+- `/facebook_monitor <pages>` - Set up Facebook event monitoring for the current channel
+- `/facebook_unmonitor` - Remove Facebook event monitoring from the current channel
+- `/facebook_list` - List all Facebook monitoring configurations for the server
+- `/facebook_check` - Manually trigger a Facebook events check (admin only)
+
+### Features
+
+- **Automatic Checking**: The bot checks for new events every 2 hours
+- **Web Scraping**: Uses advanced scraping techniques to find events from public Facebook pages
+- **Rich Embeds**: Events are posted with detailed information including:
+  - Event title and description
+  - Start times (when available)
+  - Location information (when available)
+  - Direct links to the Facebook event
+- **Duplicate Prevention**: The bot keeps track of previously seen events
+- **Multiple Pages**: Monitor multiple Facebook pages per channel (like fklub and ADSLAAU)
+- **Per-Guild Configuration**: Each server can have its own monitoring setup
+- **Fallback Methods**: Uses multiple detection methods including RSS feeds when available
+
+### Notes
+
+- **No Facebook API Token Required**: Uses web scraping of public pages instead of Facebook's API
+- Requires `MANAGE_CHANNELS` permission to set up monitoring
+- Works with any public Facebook page, even if you're not an admin
+- May miss some events if Facebook significantly changes their page structure
+- The bot will post error messages to monitored channels if scraping fails
+- **Rate Limited**: Respects Facebook's servers with reasonable request intervals
 
 ## Example Usage
 

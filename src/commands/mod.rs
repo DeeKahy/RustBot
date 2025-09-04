@@ -3,6 +3,7 @@ pub mod bonk;
 pub mod cleanup;
 pub mod coinflip;
 pub mod dice;
+pub mod facebook_events;
 pub mod general;
 pub mod hangman;
 pub mod hello;
@@ -31,6 +32,10 @@ pub use bonk::bonk;
 pub use cleanup::cleanup;
 pub use coinflip::coinflip;
 pub use dice::dice;
+pub use facebook_events::{
+    facebook_check, facebook_list, facebook_monitor, facebook_unmonitor,
+    start_facebook_event_scheduler,
+};
 pub use hangman::{endhangman, hangman, hangmanhint, hangmanstatus, letter};
 pub use hello::hello;
 pub use help::help;

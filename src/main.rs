@@ -11,10 +11,12 @@ mod utils;
 use utils::send_dm_to_deekahy;
 
 use commands::{
-    board, bonk, cleanup, coinflip, dice, endgame, endhangman, endttt, gamestatus, guess, hangman,
-    hangmanhint, hangmanstatus, hello, help, hint, hit, invite, kys, letter, mock, move_ttt,
-    numberguess, park, pfp, ping, poll, react, remind, spamping, start_parking_scheduler,
-    start_reminder_checker, stats, status, tictactoe, update, uwu, yourmom,
+    board, bonk, cleanup, coinflip, dice, endgame, endhangman, endttt, facebook_check,
+    facebook_list, facebook_monitor, facebook_unmonitor, gamestatus, guess, hangman, hangmanhint,
+    hangmanstatus, hello, help, hint, hit, invite, kys, letter, mock, move_ttt, numberguess, park,
+    pfp, ping, poll, react, remind, spamping, start_facebook_event_scheduler,
+    start_parking_scheduler, start_reminder_checker, stats, status, tictactoe, update, uwu,
+    yourmom,
 };
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -94,6 +96,11 @@ async fn main() {
                 hit(),
                 bonk(),
                 park(),
+                // Facebook events commands
+                facebook_monitor(),
+                facebook_unmonitor(),
+                facebook_list(),
+                facebook_check(),
                 // Game commands
                 numberguess(),
                 guess(),
@@ -263,6 +270,10 @@ async fn main() {
                 // Start parking scheduler background task
                 start_parking_scheduler(ctx.http.clone());
                 log::info!("Parking scheduler started");
+
+                // Start Facebook event scheduler background task
+                start_facebook_event_scheduler(ctx.http.clone()).await;
+                log::info!("Facebook event scheduler started");
 
                 Ok(Data {})
             })
