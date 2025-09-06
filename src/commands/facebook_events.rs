@@ -114,17 +114,106 @@ pub async fn facebook_monitor(
     save_config(&config)?;
 
     let pages_display = facebook_pages.join(", ");
-    ctx.say(format!(
-        "✅ Facebook event monitoring set up for this channel!\n\
-        **Monitoring pages:** {}\n\
-        **Channel:** <#{}>\n\
-        \n\
-        The bot will check for new events every 2 hours and post them here.\n\
-        \n\
-        ⚠️ **Note:** This uses web scraping of public Facebook pages. Some events may not be detected if Facebook changes their page structure.",
-        pages_display,
-        channel_id.get()
-    )).await?;
+    // Immediately check for events on the newly added pages
+    let mut initial_events_found = 0;
+    let mut initial_status = String::new();
+
+    // Load current event history to avoid posting duplicates
+    let mut history = load_event_history().unwrap_or_default();
+    let current_time = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    for page_id in &facebook_pages {
+        match scrape_facebook_events(page_id).await {
+            Ok(events) => {
+                let mut posted_for_page = 0;
+                for event in events.into_iter().take(1) {
+                    // Only take the latest event per page
+                    // Check if this event has already been seen
+                    if !history.seen_events.contains_key(&event.id) {
+                        // Mark as seen
+                        history.seen_events.insert(event.id.clone(), current_time);
+
+                        // Post to Discord
+                        if let Err(e) =
+                            post_event_to_discord(&ctx.serenity_context().http, channel_id, &event)
+                                .await
+                        {
+                            log::error!(
+                                "Failed to post initial event {} to Discord: {}",
+                                event.id,
+                                e
+                            );
+                        } else {
+                            posted_for_page += 1;
+                            initial_events_found += 1;
+                            log::info!(
+                                "Posted initial Facebook event {} to channel {}",
+                                event.id,
+                                channel_id
+                            );
+                        }
+                    }
+                }
+                if posted_for_page > 0 {
+                    initial_status.push_str(&format!(
+                        "\n📅 Found and posted {} recent event from `{}`",
+                        posted_for_page, page_id
+                    ));
+                }
+            }
+            Err(e) => {
+                log::error!(
+                    "Failed to scrape initial events from Facebook page {}: {}",
+                    page_id,
+                    e
+                );
+                initial_status.push_str(&format!(
+                    "\n⚠️ Could not fetch initial events from `{}`: {}",
+                    page_id, e
+                ));
+            }
+        }
+    }
+
+    // Save updated history
+    if let Err(e) = save_event_history(&history) {
+        log::error!("Failed to save event history after initial check: {}", e);
+    }
+
+    let summary_message = if initial_events_found > 0 {
+        format!(
+            "✅ Facebook event monitoring set up for this channel!\n\
+            **Monitoring pages:** {}\n\
+            **Channel:** <#{}>\n\
+            \n\
+            🎉 **Found {} recent event(s) and posted them above!**\n\
+            The bot will continue checking for new events every 2 hours.{}\n\
+            \n\
+            ⚠️ **Note:** This uses web scraping of public Facebook pages. Some events may not be detected if Facebook changes their page structure.",
+            pages_display,
+            channel_id.get(),
+            initial_events_found,
+            initial_status
+        )
+    } else {
+        format!(
+            "✅ Facebook event monitoring set up for this channel!\n\
+            **Monitoring pages:** {}\n\
+            **Channel:** <#{}>\n\
+            \n\
+            The bot will check for new events every 2 hours and post them here.{}\n\
+            \n\
+            ⚠️ **Note:** This uses web scraping of public Facebook pages. Some events may not be detected if Facebook changes their page structure.",
+            pages_display,
+            channel_id.get(),
+            initial_status
+        )
+    };
+
+    ctx.say(summary_message).await?;
 
     // Start the scheduler if it's not already running
     start_facebook_event_scheduler(ctx.serenity_context().http.clone()).await;
