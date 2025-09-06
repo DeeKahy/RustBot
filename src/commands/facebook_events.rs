@@ -121,7 +121,7 @@ pub async fn facebook_monitor(
         **Monitoring pages:** {}\n\
         **Channel:** <#{}>\n\
         \n\
-        🔍 **Checking for recent events to test the setup...**\n\
+        🔍 **Checking for available events to test the setup...**\n\
         \n\
         ⚠️ **Note:** This uses web scraping of public Facebook pages. Some events may not be detected if Facebook changes their page structure.",
         pages_display,
@@ -132,30 +132,54 @@ pub async fn facebook_monitor(
     let mut initial_events_found = 0;
 
     if let Ok(mut history) = load_event_history() {
+        log::info!(
+            "Successfully loaded event history with {} seen events",
+            history.seen_events.len()
+        );
         if let Ok(current_time) = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
         {
             let current_time = current_time.as_secs();
 
             for page_id in &facebook_pages {
+                log::info!("Starting initial event check for page: {}", page_id);
                 match scrape_facebook_events(page_id).await {
                     Ok(events) => {
+                        log::info!(
+                            "Initial scrape found {} events for page {}",
+                            events.len(),
+                            page_id
+                        );
                         for event in events.into_iter().take(1) {
+                            log::info!(
+                                "Checking event {} - already seen: {}",
+                                event.id,
+                                history.seen_events.contains_key(&event.id)
+                            );
                             if !history.seen_events.contains_key(&event.id) {
                                 history.seen_events.insert(event.id.clone(), current_time);
 
-                                if let Ok(()) = post_event_to_discord(
+                                match post_event_to_discord(
                                     &ctx.serenity_context().http,
                                     channel_id,
                                     &event,
                                 )
                                 .await
                                 {
-                                    initial_events_found += 1;
-                                    log::info!(
-                                        "Posted initial Facebook event {} to channel {}",
-                                        event.id,
-                                        channel_id
-                                    );
+                                    Ok(()) => {
+                                        initial_events_found += 1;
+                                        log::info!(
+                                            "Posted initial Facebook event {} to channel {}",
+                                            event.id,
+                                            channel_id
+                                        );
+                                    }
+                                    Err(e) => {
+                                        log::error!(
+                                            "Failed to post initial event {} to Discord: {}",
+                                            event.id,
+                                            e
+                                        );
+                                    }
                                 }
                             }
                         }
@@ -166,15 +190,20 @@ pub async fn facebook_monitor(
                 }
             }
 
-            let _ = save_event_history(&history);
+            match save_event_history(&history) {
+                Ok(()) => log::info!("Successfully saved updated event history"),
+                Err(e) => log::error!("Failed to save event history: {}", e),
+            }
         }
+    } else {
+        log::error!("Failed to load event history for initial check");
     }
 
     // Send a follow-up message about the results
     let follow_up = if initial_events_found > 0 {
-        format!("🎉 **Found and posted {} recent event(s)!** The bot will continue checking for new events every 2 hours.", initial_events_found)
+        format!("🎉 **Found and posted {} event(s)!** The bot will continue checking for new events every 2 hours.", initial_events_found)
     } else {
-        "📭 **No recent events found.** The bot will check for new events every 2 hours and post them here.".to_string()
+        "📭 **No events found on the monitored pages.** The bot will check for new events every 2 hours and post them here.".to_string()
     };
 
     ctx.say(follow_up).await?;
@@ -336,19 +365,49 @@ async fn scrape_facebook_events(
 
         match client.get(&url).send().await {
             Ok(response) => {
-                if response.status().is_success() {
-                    let html_content = response.text().await?;
+                let status = response.status();
+                log::info!("HTTP response status for {}: {}", url, status);
 
-                    if let Ok(events) = parse_facebook_events_html(&html_content, page_id) {
-                        if !events.is_empty() {
-                            log::info!("Successfully scraped {} events from {}", events.len(), url);
-                            return Ok(events);
+                if status.is_success() {
+                    let html_content = response.text().await?;
+                    log::info!(
+                        "Received HTML content of {} bytes from {}",
+                        html_content.len(),
+                        url
+                    );
+
+                    // Log a snippet of the HTML to see what we're getting
+                    let preview = if html_content.len() > 500 {
+                        &html_content[..500]
+                    } else {
+                        &html_content
+                    };
+                    log::debug!("HTML preview from {}: {}", url, preview);
+
+                    match parse_facebook_events_html(&html_content, page_id) {
+                        Ok(events) => {
+                            log::info!("Parsed {} events from HTML for {}", events.len(), url);
+                            if !events.is_empty() {
+                                log::info!(
+                                    "Successfully scraped {} events from {}",
+                                    events.len(),
+                                    url
+                                );
+                                return Ok(events);
+                            } else {
+                                log::warn!("No events found in HTML from {}", url);
+                            }
+                        }
+                        Err(e) => {
+                            log::error!("Failed to parse HTML from {}: {}", url, e);
                         }
                     }
+                } else {
+                    log::warn!("HTTP request to {} returned status: {}", url, status);
                 }
             }
             Err(e) => {
-                log::warn!("Failed to fetch {}: {}", url, e);
+                log::error!("Failed to fetch {}: {}", url, e);
             }
         }
     }
@@ -385,35 +444,76 @@ fn parse_facebook_events_html(
         r#"[data-testid*="event"]"#,
     ];
 
+    log::info!(
+        "Starting to parse HTML for events using {} selectors",
+        event_selectors.len()
+    );
+
     for selector_str in event_selectors {
+        log::debug!("Trying selector: {}", selector_str);
         if let Ok(selector) = Selector::parse(selector_str) {
+            let mut matches = 0;
             for element in document.select(&selector) {
+                matches += 1;
                 if let Some(href) = element.value().attr("href") {
+                    log::debug!("Found potential event link: {}", href);
                     if let Some(event) = extract_event_from_link(href, page_id) {
                         // Check for duplicate events
                         if !events.iter().any(|e: &FacebookEvent| e.id == event.id) {
+                            log::info!("Found valid event: {} ({})", event.name, event.id);
                             events.push(event);
+                        } else {
+                            log::debug!("Skipping duplicate event: {}", event.id);
                         }
+                    } else {
+                        log::debug!("Link did not parse as valid event: {}", href);
                     }
+                } else {
+                    log::debug!("Element matched selector but had no href attribute");
                 }
             }
+            log::debug!("Selector '{}' matched {} elements", selector_str, matches);
+        } else {
+            log::error!("Failed to parse CSS selector: {}", selector_str);
         }
     }
 
     // Also look for structured data
+    log::debug!("Looking for structured data (JSON-LD) in script tags");
     if let Ok(script_selector) = Selector::parse(r#"script[type="application/ld+json"]"#) {
+        let mut script_count = 0;
         for script in document.select(&script_selector) {
+            script_count += 1;
             let script_text = script.text().collect::<String>();
-            if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(&script_text) {
-                if let Some(structured_events) =
-                    extract_events_from_structured_data(&json_value, page_id)
-                {
-                    events.extend(structured_events);
+            log::debug!(
+                "Found JSON-LD script #{}, length: {}",
+                script_count,
+                script_text.len()
+            );
+
+            match serde_json::from_str::<serde_json::Value>(&script_text) {
+                Ok(json_value) => {
+                    if let Some(structured_events) =
+                        extract_events_from_structured_data(&json_value, page_id)
+                    {
+                        log::info!(
+                            "Found {} events in structured data",
+                            structured_events.len()
+                        );
+                        events.extend(structured_events);
+                    } else {
+                        log::debug!("No events found in this JSON-LD script");
+                    }
+                }
+                Err(e) => {
+                    log::debug!("Failed to parse JSON-LD script: {}", e);
                 }
             }
         }
+        log::debug!("Found {} JSON-LD script tags total", script_count);
     }
 
+    log::info!("Final event count for page {}: {}", page_id, events.len());
     Ok(events)
 }
 
