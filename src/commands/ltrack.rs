@@ -486,18 +486,7 @@ async fn fetch_player_data(
     let (account, summoner, league_entries) = if needs_fresh_account_data {
         let account = client.get_account_by_riot_id(game_name, tag_line).await?;
         let summoner = client.get_summoner_by_puuid(&account.puuid).await?;
-        let league_entries = client
-            .get_league_entries(&account.puuid)
-            .await
-            .unwrap_or_else(|e| {
-                log::error!(
-                    "Failed to get league entries for {} (PUUID: {}): {}",
-                    cache_key,
-                    account.puuid,
-                    e
-                );
-                Vec::new()
-            });
+        let league_entries = client.get_league_entries(&account.puuid).await?;
         (account, summoner, league_entries)
     } else if use_cache && cached_data.is_some() {
         let cache = cached_data.as_ref().unwrap();
@@ -510,18 +499,7 @@ async fn fetch_player_data(
         // This shouldn't happen, but fallback to fresh data
         let account = client.get_account_by_riot_id(game_name, tag_line).await?;
         let summoner = client.get_summoner_by_puuid(&account.puuid).await?;
-        let league_entries = client
-            .get_league_entries(&account.puuid)
-            .await
-            .unwrap_or_else(|e| {
-                log::error!(
-                    "Failed to get league entries for {} (PUUID: {}): {}",
-                    cache_key,
-                    account.puuid,
-                    e
-                );
-                Vec::new()
-            });
+        let league_entries = client.get_league_entries(&account.puuid).await?;
         (account, summoner, league_entries)
     };
 
