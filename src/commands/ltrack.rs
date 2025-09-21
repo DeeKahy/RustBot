@@ -47,6 +47,16 @@ struct Summoner {
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
+struct RiotAccount {
+    puuid: String,
+    #[serde(rename = "gameName")]
+    game_name: String,
+    #[serde(rename = "tagLine")]
+    tag_line: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct LeagueEntry {
     #[serde(rename = "leagueId")]
     league_id: String,
@@ -208,18 +218,30 @@ impl RiotClient {
         Ok(json)
     }
 
-    async fn get_summoner_by_name(&self, name: &str) -> AnyhowResult<Summoner> {
+    async fn get_account_by_riot_id(
+        &self,
+        game_name: &str,
+        tag_line: &str,
+    ) -> AnyhowResult<RiotAccount> {
         let url = format!(
-            "https://{}.api.riotgames.com/lol/summoner/v4/summoners/by-name/{}",
-            self.platform, name
+            "https://{}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/{}/{}",
+            self.region, game_name, tag_line
         );
         self.rate_limited_request(&url).await
     }
 
-    async fn get_league_entries(&self, summoner_id: &str) -> AnyhowResult<Vec<LeagueEntry>> {
+    async fn get_summoner_by_puuid(&self, puuid: &str) -> AnyhowResult<Summoner> {
         let url = format!(
-            "https://{}.api.riotgames.com/lol/league/v4/entries/by-summoner/{}",
-            self.platform, summoner_id
+            "https://{}.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/{}",
+            self.platform, puuid
+        );
+        self.rate_limited_request(&url).await
+    }
+
+    async fn get_league_entries(&self, puuid: &str) -> AnyhowResult<Vec<LeagueEntry>> {
+        let url = format!(
+            "https://{}.api.riotgames.com/lol/league/v4/entries/by-puuid/{}",
+            self.platform, puuid
         );
         self.rate_limited_request(&url).await
     }
@@ -243,7 +265,7 @@ impl RiotClient {
         self.rate_limited_request(&url).await
     }
 
-    async fn get_match(&self, match_id: &str) -> AnyhowResult<Match> {
+    async fn get_match_details(&self, match_id: &str) -> AnyhowResult<Match> {
         let url = format!(
             "https://{}.api.riotgames.com/lol/match/v5/matches/{}",
             self.region, match_id
@@ -453,14 +475,18 @@ fn create_lp_chart(play_points: &[PlayPoint], summoner_name: &str) -> AnyhowResu
 
 async fn fetch_player_data(
     client: &RiotClient,
-    summoner_name: &str,
-    target_hours: f64,
+    game_name: &str,
+    tag_line: &str,
+    max_duration_hours: f64,
 ) -> AnyhowResult<(Summoner, Vec<LeagueEntry>, Vec<PlayPoint>)> {
-    // Get summoner info
-    let summoner = client.get_summoner_by_name(summoner_name).await?;
+    // Get account info using Riot ID
+    let account = client.get_account_by_riot_id(game_name, tag_line).await?;
+
+    // Get summoner info using PUUID
+    let summoner = client.get_summoner_by_puuid(&account.puuid).await?;
 
     // Get current rank
-    let league_entries = client.get_league_entries(&summoner.id).await?;
+    let league_entries = client.get_league_entries(&account.puuid).await?;
 
     // Fetch matches until we hit target hours
     let mut all_matches = Vec::new();
@@ -474,10 +500,10 @@ async fn fetch_player_data(
             .unwrap(),
     );
 
-    while total_duration_hours < target_hours && start < 2000 {
+    while total_duration_hours < max_duration_hours && start < 2000 {
         progress.set_message(format!(
             "Fetching matches... {:.1}h/{:.1}h",
-            total_duration_hours, target_hours
+            total_duration_hours, max_duration_hours
         ));
 
         let match_ids = client
@@ -489,12 +515,12 @@ async fn fetch_player_data(
         }
 
         for match_id in match_ids {
-            let match_data = client.get_match(&match_id).await?;
+            let match_data = client.get_match_details(&match_id).await?;
             let duration_hours = match_data.info.game_duration as f64 / 3600.0;
             total_duration_hours += duration_hours;
             all_matches.push(match_data);
 
-            if total_duration_hours >= target_hours {
+            if total_duration_hours >= max_duration_hours {
                 break;
             }
         }
@@ -564,13 +590,13 @@ async fn fetch_player_data(
 #[poise::command(prefix_command, slash_command)]
 pub async fn ltrack(
     ctx: Context<'_>,
-    #[description = "Summoner name to track"] summoner_name: String,
+    #[description = "Riot ID (GameName#TagLine) to track"] riot_id: String,
     #[description = "Platform (default: EUW1)"] platform: Option<String>,
 ) -> Result<(), Error> {
     let api_key = env::var("RIOT_API_KEY")
         .map_err(|_| "❌ RIOT_API_KEY not found in environment variables")?;
 
-    log::info!("ltrack command called for summoner: {}", summoner_name);
+    log::info!("ltrack command called for Riot ID: {}", riot_id);
     log::info!("API key present: {} characters", api_key.len());
 
     // Validate API key format (should be like: RGAPI-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
@@ -596,12 +622,19 @@ pub async fn ltrack(
 
     let client = RiotClient::new(api_key, platform.clone(), region.to_string());
 
+    // Parse Riot ID (GameName#TagLine)
+    let parts: Vec<&str> = riot_id.split('#').collect();
+    if parts.len() != 2 {
+        return Err("❌ Invalid Riot ID format. Use: GameName#TagLine (e.g., Faker#KR1)".into());
+    }
+    let (game_name, tag_line) = (parts[0], parts[1]);
+
     // Send initial response
     let reply = ctx
-        .say(format!("🔍 Fetching data for **{}**...", summoner_name))
+        .say(format!("🔍 Fetching data for **{}**...", riot_id))
         .await?;
 
-    match fetch_player_data(&client, &summoner_name, 100.0).await {
+    match fetch_player_data(&client, game_name, tag_line, 100.0).await {
         Ok((summoner, league_entries, mut play_points)) => {
             if play_points.is_empty() {
                 reply
@@ -625,7 +658,7 @@ pub async fn ltrack(
             estimate_lp(&mut play_points, current_lp);
 
             // Generate chart
-            match create_lp_chart(&play_points, &summoner.name) {
+            match create_lp_chart(&play_points, &account.game_name) {
                 Ok(chart_svg) => {
                     // Calculate stats
                     let total_games = play_points.len();
