@@ -339,7 +339,7 @@ or
 
 ## League of Legends Player Tracking 🎮
 
-The bot can track League of Legends players' ranked progression and generate visual charts showing LP changes over time.
+The bot can track League of Legends players' ranked progression with comprehensive statistics and intelligent caching for optimal performance.
 
 ### Setup
 
@@ -352,12 +352,18 @@ To use the `-ltrack` command, you need a Riot Games API key:
 
 ### Commands
 
-- `-ltrack <summoner>` - Track player on EUW (default region)
-- `-ltrack <summoner> <region>` - Track player on specified region (NA1, EUW1, KR, etc.)
+- `-ltrack Faker#KR1` - Analyze player with 20 hours (default)
+- `-ltrack Faker#KR1 EUW1` - Analyze player on specified region
+- `-ltrack Faker#KR1 EUW1 50` - Analyze 50 hours of match history
+- `-ltrack Player#TAG NA1 10` - Quick 10-hour analysis
+- `-cache_stats` - View cache statistics and performance
+- `-cache_stats clear` - Clear all cached data (owner only)
 
 ### Features
 
-- **Comprehensive Data**: Fetches ~100 hours of ranked Solo/Duo gameplay
+- **Comprehensive Data**: Analyze 1-200 hours of ranked Solo/Duo gameplay
+- **Smart Caching**: Intelligent cache system reduces API calls and improves response times
+- **Flexible Analysis**: Customize analysis window from quick 1-hour snapshots to extensive 200-hour deep dives
 - **LP Estimation**: Estimates LP progression based on win/loss patterns and typical gains/losses
 - **Visual Charts**: Generates SVG graphs showing LP vs cumulative playtime
 - **Performance Stats**: Shows current rank, win rate, and game statistics
