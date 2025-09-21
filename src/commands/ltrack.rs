@@ -149,6 +149,12 @@ impl RiotClient {
     {
         RATE_LIMITER.until_ready().await;
 
+        log::info!("Making API request to: {}", url);
+        log::debug!(
+            "Using API key (first 8 chars): {}",
+            &self.api_key[..8.min(self.api_key.len())]
+        );
+
         let response = self
             .http
             .get(url)
@@ -156,7 +162,10 @@ impl RiotClient {
             .send()
             .await?;
 
-        if response.status() == 429 {
+        let status = response.status();
+        log::info!("API response status: {}", status);
+
+        if status == 429 {
             // Rate limited, wait and retry
             let retry_after = response
                 .headers()
@@ -165,16 +174,34 @@ impl RiotClient {
                 .and_then(|s| s.parse::<u64>().ok())
                 .unwrap_or(10);
 
+            log::warn!("Rate limited, waiting {} seconds", retry_after);
             sleep(Duration::from_secs(retry_after)).await;
             return Box::pin(self.rate_limited_request(url)).await;
         }
 
-        if !response.status().is_success() {
-            return Err(anyhow!(
-                "API request failed: {} - {}",
-                response.status(),
-                url
-            ));
+        if !status.is_success() {
+            let error_body = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unable to read error body".to_string());
+            log::error!(
+                "API request failed: {} - {} - Body: {}",
+                status,
+                url,
+                error_body
+            );
+
+            if status == 403 {
+                return Err(anyhow!(
+                    "403 Forbidden - Invalid or expired API key. Please check your RIOT_API_KEY"
+                ));
+            } else if status == 404 {
+                return Err(anyhow!(
+                    "404 Not Found - Summoner not found or invalid region"
+                ));
+            } else {
+                return Err(anyhow!("API request failed: {} - {}", status, error_body));
+            }
         }
 
         let json = response.json::<T>().await?;
@@ -543,6 +570,20 @@ pub async fn ltrack(
     let api_key = env::var("RIOT_API_KEY")
         .map_err(|_| "❌ RIOT_API_KEY not found in environment variables")?;
 
+    log::info!("ltrack command called for summoner: {}", summoner_name);
+    log::info!("API key present: {} characters", api_key.len());
+
+    // Validate API key format (should be like: RGAPI-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+    if !api_key.starts_with("RGAPI-") || api_key.len() != 42 {
+        return Err(format!(
+            "❌ Invalid API key format. Expected format: RGAPI-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx\n\
+            Your key: {}... (length: {})\n\
+            Get a valid key from: https://developer.riotgames.com/",
+            &api_key[..10.min(api_key.len())],
+            api_key.len()
+        ).into());
+    }
+
     let platform = platform
         .unwrap_or_else(|| "euw1".to_string())
         .to_lowercase();
@@ -656,16 +697,27 @@ pub async fn ltrack(
             }
         }
         Err(e) => {
-            let error_msg = if e.to_string().contains("404") {
+            log::error!("Error in ltrack command: {:?}", e);
+
+            let error_msg = if e.to_string().contains("404") || e.to_string().contains("Not Found")
+            {
                 format!(
                     "❌ Summoner '{}' not found on {}. Please check the spelling and region.",
                     summoner_name,
                     platform.to_uppercase()
                 )
-            } else if e.to_string().contains("403") {
-                "❌ Invalid or expired Riot API key. Please check the RIOT_API_KEY environment variable.".to_string()
+            } else if e.to_string().contains("403")
+                || e.to_string().contains("Forbidden")
+                || e.to_string().contains("Invalid or expired API key")
+            {
+                format!(
+                    "❌ Invalid or expired Riot API key. Please check the RIOT_API_KEY environment variable.\n\
+                    Get a new key from: https://developer.riotgames.com/\n\
+                    Current key starts with: {}...",
+                    &env::var("RIOT_API_KEY").unwrap_or_default()[..8.min(env::var("RIOT_API_KEY").unwrap_or_default().len())]
+                )
             } else {
-                format!("❌ Error fetching player data: {}", e)
+                format!("❌ Error fetching player data: {}\n\nPlease check:\n• Your API key is valid\n• The summoner name is correct\n• The region is correct", e)
             };
 
             reply

@@ -55,8 +55,14 @@ async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
 
 #[tokio::main]
 async fn main() {
-    // Initialize logger
-    env_logger::init();
+    // Initialize logger with filtering to reduce noise
+    env_logger::Builder::from_default_env()
+        .filter_level(log::LevelFilter::Info)
+        .filter_module("serenity::gateway", log::LevelFilter::Warn)
+        .filter_module("tracing::span", log::LevelFilter::Warn)
+        .filter_module("serenity::gateway::shard", log::LevelFilter::Warn)
+        .filter_module("serenity::gateway::bridge", log::LevelFilter::Warn)
+        .init();
 
     // Load environment variables from .env file
     dotenvy::dotenv().ok();
