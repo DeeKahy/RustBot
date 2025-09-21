@@ -498,33 +498,35 @@ async fn fetch_player_data(
         Vec::new()
     };
 
-    // Determine if we need to fetch new matches
-    let latest_cached_timestamp = all_matches
-        .iter()
-        .map(|m| m.info.game_end_timestamp)
-        .max()
-        .unwrap_or(0);
-
     // Calculate duration from cached matches first
     let cached_duration_hours: f64 = all_matches
         .iter()
         .map(|m| m.info.game_duration as f64 / 3600.0)
         .sum();
 
-    // If we already have enough cached data, don't fetch more
+    // If we already have enough cached data for this request, we're done
     if cached_duration_hours >= max_duration_hours {
         log::info!(
-            "Cache contains sufficient data ({:.1}h >= {:.1}h), skipping fetch",
+            "Cache contains sufficient data ({:.1}h >= {:.1}h), using cached data only",
             cached_duration_hours,
             max_duration_hours
         );
+    } else if cached_duration_hours > 0.0 {
+        log::info!(
+            "Extending cached data: have {:.1}h, need {:.1}h more",
+            cached_duration_hours,
+            max_duration_hours - cached_duration_hours
+        );
     }
 
-    // Fetch new matches if needed
-    let mut start = 0;
+    // Determine where to start fetching (after existing cached matches)
+    let mut start = if !all_matches.is_empty() {
+        all_matches.len()
+    } else {
+        0
+    };
     let mut new_matches_count = 0;
-    let mut should_fetch_more = cached_duration_hours < max_duration_hours;
-    let mut current_duration_hours = cached_duration_hours;
+    let mut total_duration_hours = cached_duration_hours;
 
     let progress = ProgressBar::new_spinner();
     progress.set_style(
@@ -533,18 +535,19 @@ async fn fetch_player_data(
             .unwrap(),
     );
 
-    while should_fetch_more && start < 2000 {
-        let progress_msg = if all_matches.is_empty() {
+    // Only fetch if we don't have enough cached data
+    while total_duration_hours < max_duration_hours && start < 2000 {
+        let progress_msg = if cached_duration_hours > 0.0 {
             format!(
-                "Fetching match history... ({:.1}h/{:.1}h)",
-                current_duration_hours, max_duration_hours
+                "Extending match history... {:.1}h/{:.1}h ({} cached)",
+                total_duration_hours,
+                max_duration_hours,
+                all_matches.len()
             )
         } else {
             format!(
-                "Checking for new matches... ({} cached, {:.1}h/{:.1}h)",
-                all_matches.len(),
-                current_duration_hours,
-                max_duration_hours
+                "Fetching match history... {:.1}h/{:.1}h",
+                total_duration_hours, max_duration_hours
             )
         };
 
@@ -567,63 +570,41 @@ async fn fetch_player_data(
             break;
         }
 
-        let mut found_cached_match = false;
         for match_id in match_ids {
-            // Check if we already have this match in cache
-            if let Some(cached_match) = MATCH_CACHE.get(&match_id).await {
-                if cached_match.info.game_end_timestamp <= latest_cached_timestamp {
-                    found_cached_match = true;
-                    continue; // Skip matches we already have
-                }
-                log::debug!("Using cached match: {}", match_id);
-                all_matches.push(cached_match.clone());
-                new_matches_count += 1;
-                current_duration_hours += cached_match.info.game_duration as f64 / 3600.0;
+            // Skip if we already have this match
+            if all_matches.iter().any(|m| m.metadata.match_id == match_id) {
+                continue;
+            }
 
-                // Check if we have enough duration
-                if current_duration_hours >= max_duration_hours {
-                    should_fetch_more = false;
-                    break;
-                }
+            // Check if we have this match in cache
+            if let Some(cached_match) = MATCH_CACHE.get(&match_id).await {
+                log::debug!("Using cached match: {}", match_id);
+                let duration_hours = cached_match.info.game_duration as f64 / 3600.0;
+                total_duration_hours += duration_hours;
+                all_matches.push(cached_match);
             } else {
                 // Fetch new match data
                 log::debug!("Fetching new match: {}", match_id);
                 let match_data = client.get_match_details(&match_id).await?;
+                let duration_hours = match_data.info.game_duration as f64 / 3600.0;
+                total_duration_hours += duration_hours;
 
                 // Cache the match for future use
                 MATCH_CACHE
                     .insert(match_id.clone(), match_data.clone())
                     .await;
 
-                if match_data.info.game_end_timestamp <= latest_cached_timestamp {
-                    found_cached_match = true;
-                } else {
-                    all_matches.push(match_data.clone());
-                    new_matches_count += 1;
-                    current_duration_hours += match_data.info.game_duration as f64 / 3600.0;
+                all_matches.push(match_data);
+                new_matches_count += 1;
+            }
 
-                    // Check if we have enough duration
-                    if current_duration_hours >= max_duration_hours {
-                        should_fetch_more = false;
-                        break;
-                    }
-                }
+            // Stop if we have enough duration
+            if total_duration_hours >= max_duration_hours {
+                break;
             }
         }
 
-        // If we've found matches we already had cached, we can stop fetching
-        if found_cached_match && new_matches_count > 0 {
-            should_fetch_more = false;
-            break;
-        }
-
         start += 100;
-
-        // Safety check to prevent infinite loops
-        if start > 500 && new_matches_count == 0 {
-            log::warn!("Stopping fetch after 500 matches with no new data for safety");
-            break;
-        }
     }
 
     // Sort all matches by timestamp
