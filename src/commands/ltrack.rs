@@ -35,14 +35,14 @@ struct Summoner {
     #[serde(rename = "accountId")]
     account_id: Option<String>,
     #[serde(rename = "profileIconId")]
-    profile_icon_id: i32,
+    profile_icon_id: Option<i32>,
     #[serde(rename = "revisionDate")]
-    revision_date: i64,
-    name: String,
-    id: String,
+    revision_date: Option<i64>,
+    name: Option<String>,
+    id: Option<String>,
     puuid: String,
     #[serde(rename = "summonerLevel")]
-    summoner_level: i64,
+    summoner_level: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -216,9 +216,17 @@ impl RiotClient {
 
         // Debug: log the response text before trying to parse it
         let response_text = response.text().await?;
-        log::debug!("API Response for {}: {}", url, response_text);
+        log::info!("API Response for {}: {}", url, response_text);
 
-        let json = serde_json::from_str::<T>(&response_text)?;
+        let json = serde_json::from_str::<T>(&response_text).map_err(|e| {
+            log::error!("Failed to parse JSON response: {}", e);
+            log::error!("Raw response: {}", response_text);
+            anyhow!(
+                "JSON parsing error: {} - Raw response: {}",
+                e,
+                response_text
+            )
+        })?;
         Ok(json)
     }
 
@@ -490,7 +498,13 @@ async fn fetch_player_data(
     let summoner = client.get_summoner_by_puuid(&account.puuid).await?;
 
     // Get current rank
-    let league_entries = client.get_league_entries(&account.puuid).await?;
+    let league_entries = client
+        .get_league_entries(&account.puuid)
+        .await
+        .unwrap_or_else(|e| {
+            log::warn!("Failed to get league entries: {}", e);
+            Vec::new()
+        });
 
     // Fetch matches until we hit target hours
     let mut all_matches = Vec::new();
@@ -662,7 +676,8 @@ pub async fn ltrack(
             estimate_lp(&mut play_points, current_lp);
 
             // Generate chart
-            match create_lp_chart(&play_points, &account.game_name) {
+            let display_name = summoner.name.as_ref().unwrap_or(&account.game_name);
+            match create_lp_chart(&play_points, display_name) {
                 Ok(chart_svg) => {
                     // Calculate stats
                     let total_games = play_points.len();
@@ -685,7 +700,7 @@ pub async fn ltrack(
 
                     // Create embed with stats
                     let embed = poise::serenity_prelude::CreateEmbed::new()
-                        .title(format!("📈 LP Tracking - {}", summoner.name))
+                        .title(format!("📈 LP Tracking - {}", display_name))
                         .description(format!(
                             "**Current Rank:** {}\n\
                             **Analyzed Period:** {:.1} hours ({} games)\n\
@@ -709,7 +724,7 @@ pub async fn ltrack(
                     // Send chart as attachment
                     let attachment = poise::serenity_prelude::CreateAttachment::bytes(
                         chart_svg.as_bytes(),
-                        format!("{}_lp_tracking.svg", summoner.name.replace(" ", "_")),
+                        format!("{}_lp_tracking.svg", display_name.replace(" ", "_")),
                     );
 
                     reply
@@ -734,7 +749,7 @@ pub async fn ltrack(
             }
         }
         Err(e) => {
-            log::error!("Error in ltrack command: {:?}", e);
+            log::error!("Error in ltrack command: {}", e);
 
             let error_msg = if e.to_string().contains("404") || e.to_string().contains("Not Found")
             {
@@ -753,8 +768,12 @@ pub async fn ltrack(
                     Current key starts with: {}...",
                     &env::var("RIOT_API_KEY").unwrap_or_default()[..8.min(env::var("RIOT_API_KEY").unwrap_or_default().len())]
                 )
+            } else if e.to_string().contains("JSON parsing error")
+                || e.to_string().contains("missing field")
+            {
+                format!("❌ API response format error: {}\n\nThis might be due to:\n• API response structure changes\n• Invalid API permissions\n• Network issues\n\nCheck the bot logs for the raw API response.", e)
             } else {
-                format!("❌ Error fetching player data: {}\n\nPlease check:\n• Your API key is valid\n• The summoner name is correct\n• The region is correct", e)
+                format!("❌ Error fetching player data: {}\n\nPlease check:\n• Your API key is valid\n• The Riot ID format is correct (GameName#TagLine)\n• The region is correct", e)
             };
 
             reply
