@@ -415,7 +415,7 @@ async fn fetch_player_data(
     max_duration_hours: f64,
     ctx: &Context<'_>,
     reply: &poise::ReplyHandle<'_>,
-) -> AnyhowResult<(Summoner, Vec<LeagueEntry>, Vec<PlayPoint>, RiotAccount)> {
+) -> AnyhowResult<(Summoner, Vec<LeagueEntry>, Vec<PlayPoint>, RiotAccount, f64)> {
     let cache_key = format!("{}#{}:{}", game_name, tag_line, client.platform);
     let target_cutoff_time =
         Utc::now() - chrono::Duration::milliseconds((max_duration_hours * 3600.0 * 1000.0) as i64);
@@ -602,19 +602,18 @@ async fn fetch_player_data(
     // Reverse to get chronological order again
     filtered_matches.reverse();
 
+    progress.finish_with_message(format!(
+        "Using {} matches ({} new, {:.1}h total)",
+        filtered_matches.len(),
+        new_matches_count,
+        total_duration_hours
+    ));
+
     let cache_hit_rate = if start > 0 {
         ((start - new_matches_count) as f64 / start as f64) * 100.0
     } else {
-        0.0
+        100.0
     };
-
-    progress.finish_with_message(format!(
-        "Using {} matches ({} new, {:.1}h total, {:.1}% cache hit rate)",
-        filtered_matches.len(),
-        new_matches_count,
-        total_duration_hours,
-        cache_hit_rate
-    ));
 
     log::info!(
         "Match processing complete for {}: {} total matches, {} new fetches, {:.1}% cache efficiency",
@@ -679,7 +678,13 @@ async fn fetch_player_data(
         }
     }
 
-    Ok((summoner, league_entries, play_points, account))
+    Ok((
+        summoner,
+        league_entries,
+        play_points,
+        account,
+        cache_hit_rate,
+    ))
 }
 
 /// Analyze a League of Legends player's ranked performance with detailed statistics
@@ -754,7 +759,7 @@ pub async fn ltrack(
         .await?;
 
     match fetch_player_data(&client, game_name, tag_line, target_hours, &ctx, &reply).await {
-        Ok((summoner, league_entries, play_points, account)) => {
+        Ok((summoner, league_entries, play_points, account, cache_hit_rate)) => {
             if play_points.is_empty() {
                 reply
                     .edit(
@@ -856,9 +861,10 @@ pub async fn ltrack(
                 .field("🔄 Most Played", most_played, true)
                 .field("⭐ Best Performer", best_performer, false)
                 .footer(poise::serenity_prelude::CreateEmbedFooter::new(format!(
-                    "Summoner Level {} • Platform: {}",
+                    "Summoner Level {} • Platform: {} • Cache Efficiency: {:.1}%",
                     summoner.summoner_level.unwrap_or(0),
-                    platform.to_uppercase()
+                    platform.to_uppercase(),
+                    cache_hit_rate
                 )))
                 .timestamp(chrono::Utc::now());
 

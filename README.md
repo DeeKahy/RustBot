@@ -364,9 +364,24 @@ To use the `-ltrack` command, you need a Riot Games API key:
 - **Comprehensive Data**: Analyze 1-200 hours of ranked Solo/Duo gameplay
 - **Smart Caching**: Intelligent cache system reduces API calls and improves response times
 - **Flexible Analysis**: Customize analysis window from quick 1-hour snapshots to extensive 200-hour deep dives
-- **LP Estimation**: Estimates LP progression based on win/loss patterns and typical gains/losses
-- **Visual Charts**: Generates SVG graphs showing LP vs cumulative playtime
-- **Performance Stats**: Shows current rank, win rate, and game statistics
+- **Performance Stats**: Shows current rank, win rate, game statistics, KDA, champion performance
+- **Live Progress Updates**: Real-time progress indicators during data fetching
+- **Efficient API Usage**: Rate limiting and caching prevent API spam and improve user experience
+
+### Caching System
+
+The bot includes an intelligent caching system that dramatically improves performance:
+
+- **Match Cache**: Stores individual match data for 7 days (matches never change once completed)
+- **Player Cache**: Stores player data and match history for 1 hour (allows for rank updates)
+- **Smart Fetching**: Only fetches new matches since last cache update
+- **Example**: If you request 100 hours of data, then play 5 hours and request 100 hours again, only the new 5 hours are fetched from the API
+
+#### Cache Benefits
+- **Faster Response Times**: Subsequent requests return almost instantly
+- **Reduced API Load**: Minimizes requests to Riot API, staying well within rate limits
+- **Better User Experience**: No waiting for data you've already fetched
+- **Automatic Management**: Cache expires automatically and handles updates intelligently
 - **Multi-Region Support**: Works with all major Riot regions
 
 ### Output
