@@ -216,7 +216,11 @@ impl RiotClient {
 
         // Debug: log the response text before trying to parse it
         let response_text = response.text().await?;
-        log::info!("API Response for {}: {}", url, response_text);
+
+        // Only log responses for account and summoner endpoints to avoid spam
+        if url.contains("/riot/account/") || url.contains("/lol/summoner/") {
+            log::info!("API Response for {}: {}", url, response_text);
+        }
 
         let json = serde_json::from_str::<T>(&response_text).map_err(|e| {
             log::error!("Failed to parse JSON response: {}", e);
