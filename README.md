@@ -37,6 +37,7 @@ A modern Discord bot built with Rust using the Serenity library and Poise comman
 - `-remind remove <id>` - Remove a specific reminder
 - `-remind clear` - Clear all your reminders
 - `-react <text>` - Add emoji reactions to a replied message spelling out the text
+- `-ltrack <summoner> [region]` - Track League of Legends player's LP progression over ~100 hours of ranked playtime
 
 ## Quick Start with Docker (Recommended)
 
@@ -282,6 +283,10 @@ RustBot/
 ## Environment Variables
 
 - `DISCORD_TOKEN` - Your Discord bot token (required)
+- `RIOT_API_KEY` - Your Riot Games API key for League of Legends tracking (required for `-ltrack` command)
+  - Get your API key from [Riot Developer Portal](https://developer.riotgames.com/)
+  - Personal API keys are free but expire after 24 hours
+  - For production use, apply for a production API key
 
 - `RUST_LOG` - Log level (optional, defaults to `info`)
 - `GIT_BRANCH` - Git branch to pull from during updates (optional, defaults to `main`)
@@ -331,6 +336,56 @@ or
 - May miss some events if Facebook significantly changes their page structure
 - The bot will post error messages to monitored channels if scraping fails
 - **Rate Limited**: Respects Facebook's servers with reasonable request intervals
+
+## League of Legends Player Tracking 🎮
+
+The bot can track League of Legends players' ranked progression and generate visual charts showing LP changes over time.
+
+### Setup
+
+To use the `-ltrack` command, you need a Riot Games API key:
+
+1. Visit the [Riot Developer Portal](https://developer.riotgames.com/)
+2. Sign in with your Riot account
+3. Generate a personal API key (free, expires after 24 hours)
+4. Add it to your environment variables as `RIOT_API_KEY`
+
+### Commands
+
+- `-ltrack <summoner>` - Track player on EUW (default region)
+- `-ltrack <summoner> <region>` - Track player on specified region (NA1, EUW1, KR, etc.)
+
+### Features
+
+- **Comprehensive Data**: Fetches ~100 hours of ranked Solo/Duo gameplay
+- **LP Estimation**: Estimates LP progression based on win/loss patterns and typical gains/losses
+- **Visual Charts**: Generates SVG graphs showing LP vs cumulative playtime
+- **Performance Stats**: Shows current rank, win rate, and game statistics
+- **Multi-Region Support**: Works with all major Riot regions
+
+### Output
+
+The bot provides:
+- Current rank and LP
+- Win rate over the analyzed period
+- Total games and playtime analyzed
+- Interactive SVG chart showing LP progression
+- Estimated LP changes based on match outcomes
+
+### Technical Details
+
+- **LP Estimation**: Uses typical LP gains (+18 for wins, -15 for losses) as Riot API doesn't provide historical LP
+- **Data Source**: Official Riot Games API with proper rate limiting
+- **Supported Queues**: Ranked Solo/Duo (queue ID 420)
+- **Time Period**: Automatically fetches matches until ~100 hours of playtime is reached
+- **Rate Limiting**: Respects Riot's API limits (100 requests per 2 minutes)
+
+### Notes
+
+- LP values are estimates based on win/loss patterns, not exact historical data
+- Personal API keys expire after 24 hours and need to be refreshed
+- For production use, apply for a production API key from Riot
+- The bot will cache match data to avoid redundant API calls
 
 ## Example Usage
 
@@ -422,6 +477,32 @@ Bot: [Replying to the "team lunch" message] ⏰ Reminder!
      
      @YourUsername
      Set 15 minutes ago
+
+User: !ltrack Faker
+Bot: 🔍 Fetching data for **Faker**...
+     [Progress messages during data fetching]
+     
+     📈 LP Tracking - Faker
+     Current Rank: Challenger I - 1337 LP
+     Analyzed Period: 99.8 hours (127 games)
+     Win Rate: 68.5% (87/127 games)
+     Average Game Length: 47.1 minutes
+     
+     LP estimates based on typical gains/losses (+18/-15).
+     Historical LP data is not available from Riot API.
+     
+     [Attached: Faker_lp_tracking.svg - Shows LP progression chart]
+
+User: !ltrack "NA Player" NA1
+Bot: 🔍 Fetching data for **NA Player**...
+     
+     📈 LP Tracking - NA Player
+     Current Rank: Diamond III - 54 LP
+     Analyzed Period: 102.3 hours (89 games)
+     Win Rate: 45.3% (40/89 games)
+     Average Game Length: 68.9 minutes
+     
+     [Attached: NA_Player_lp_tracking.svg - Shows declining LP trend]
 
 [1 hour later, bot replies to the original message]
 Bot: [Replying to the original message] ⏰ Reminder!
