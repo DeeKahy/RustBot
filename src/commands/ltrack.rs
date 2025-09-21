@@ -3,8 +3,6 @@ use anyhow::{anyhow, Result as AnyhowResult};
 use chrono::{DateTime, Utc};
 use governor::{Quota, RateLimiter};
 use indicatif::{ProgressBar, ProgressStyle};
-use plotters::prelude::*;
-use plotters_svg::SVGBackend;
 use reqwest::Client;
 use serde::Deserialize;
 use std::num::NonZeroU32;
@@ -32,6 +30,7 @@ static RATE_LIMITER: once_cell::sync::Lazy<
 });
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct Summoner {
     #[serde(rename = "accountId")]
     account_id: String,
@@ -47,6 +46,7 @@ struct Summoner {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct LeagueEntry {
     #[serde(rename = "leagueId")]
     league_id: String,
@@ -82,6 +82,7 @@ struct MatchInfo {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct Participant {
     puuid: String,
     win: bool,
@@ -93,6 +94,7 @@ struct Participant {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct Match {
     #[serde(rename = "metadata")]
     metadata: MatchMetadata,
@@ -100,6 +102,7 @@ struct Match {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct MatchMetadata {
     #[serde(rename = "matchId")]
     match_id: String,
@@ -107,6 +110,7 @@ struct MatchMetadata {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct PlayPoint {
     cum_hours: f64,
     timestamp: DateTime<Utc>,
@@ -241,61 +245,183 @@ fn estimate_lp(play_points: &mut [PlayPoint], seed_lp: i32) {
 }
 
 fn create_lp_chart(play_points: &[PlayPoint], summoner_name: &str) -> AnyhowResult<String> {
-    let mut buffer = String::new();
-    {
-        let backend = SVGBackend::with_string(&mut buffer, (1200, 700));
-        let root = backend.into_drawing_area();
-        root.fill(&WHITE)?;
+    let max_hours = play_points.last().map(|p| p.cum_hours).unwrap_or(100.0);
+    let width = 1200.0;
+    let height = 700.0;
+    let margin = 60.0;
+    let plot_width = width - 2.0 * margin;
+    let plot_height = height - 2.0 * margin;
 
-        let max_hours = play_points.last().map(|p| p.cum_hours).unwrap_or(100.0);
+    let mut svg = String::new();
+    svg.push_str(&format!(
+        r#"<svg width="{}" height="{}" xmlns="http://www.w3.org/2000/svg">
+<style>
+.axis {{ stroke: #333; stroke-width: 1; }}
+.grid {{ stroke: #ddd; stroke-width: 0.5; }}
+.lp-line {{ stroke: #2563eb; stroke-width: 2; fill: none; }}
+.win-point {{ fill: #10b981; }}
+.loss-point {{ fill: #ef4444; }}
+.text {{ font-family: Arial, sans-serif; text-anchor: middle; }}
+.title {{ font-size: 24px; font-weight: bold; }}
+.axis-label {{ font-size: 14px; }}
+</style>
+"#,
+        width, height
+    ));
 
-        let mut chart = ChartBuilder::on(&root)
-            .caption(
-                &format!(
-                    "{} - LP vs Playtime (Last ~{:.0}h)",
-                    summoner_name, max_hours
-                ),
-                ("sans-serif", 40),
-            )
-            .margin(20)
-            .x_label_area_size(60)
-            .y_label_area_size(80)
-            .build_cartesian_2d(0.0..max_hours, 0i32..100i32)?;
+    // Background
+    svg.push_str(&format!(
+        r#"<rect width="{}" height="{}" fill="white"/>"#,
+        width, height
+    ));
 
-        chart
-            .configure_mesh()
-            .x_desc("Cumulative Playtime (hours)")
-            .y_desc("LP")
-            .axis_desc_style(("sans-serif", 20))
-            .draw()?;
+    // Title
+    svg.push_str(&format!(
+        r#"<text x="{}" y="30" class="text title">{} - LP vs Playtime (Last ~{:.0}h)</text>"#,
+        width / 2.0,
+        summoner_name,
+        max_hours
+    ));
 
-        // Draw LP line
-        let lp_points: Vec<(f64, i32)> = play_points
-            .iter()
-            .filter_map(|p| p.lp_estimate.map(|lp| (p.cum_hours, lp)))
-            .collect();
+    // Grid lines and axes
+    let x_scale = plot_width / max_hours;
+    let y_scale = plot_height / 100.0;
 
-        if !lp_points.is_empty() {
-            chart
-                .draw_series(LineSeries::new(lp_points.iter().cloned(), &BLUE))?
-                .label("Estimated LP")
-                .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 10, y)], &BLUE));
-        }
+    // Y-axis
+    svg.push_str(&format!(
+        r#"<line x1="{}" y1="{}" x2="{}" y2="{}" class="axis"/>"#,
+        margin,
+        margin,
+        margin,
+        margin + plot_height
+    ));
 
-        // Draw win/loss markers
-        for point in play_points {
-            if let Some(lp) = point.lp_estimate {
-                let color = if point.won { &GREEN } else { &RED };
-                let marker = Circle::new((point.cum_hours, lp), 2, color.filled());
-                chart.draw_series(std::iter::once(marker))?;
-            }
-        }
+    // X-axis
+    svg.push_str(&format!(
+        r#"<line x1="{}" y1="{}" x2="{}" y2="{}" class="axis"/>"#,
+        margin,
+        margin + plot_height,
+        margin + plot_width,
+        margin + plot_height
+    ));
 
-        chart.configure_series_labels().draw()?;
-        root.present()?;
+    // Y-axis labels (LP)
+    for lp in (0..=100).step_by(20) {
+        let y = margin + plot_height - (lp as f64 * y_scale);
+        svg.push_str(&format!(
+            r#"<line x1="{}" y1="{}" x2="{}" y2="{}" class="grid"/>"#,
+            margin,
+            y,
+            margin + plot_width,
+            y
+        ));
+        svg.push_str(&format!(
+            r#"<text x="{}" y="{}" class="text axis-label" text-anchor="end">{}</text>"#,
+            margin - 10.0,
+            y + 5.0,
+            lp
+        ));
     }
 
-    Ok(buffer)
+    // X-axis labels (hours)
+    let hour_step = (max_hours / 10.0).ceil();
+    for i in 0..=10 {
+        let hours = i as f64 * hour_step;
+        if hours <= max_hours {
+            let x = margin + (hours * x_scale);
+            svg.push_str(&format!(
+                r#"<line x1="{}" y1="{}" x2="{}" y2="{}" class="grid"/>"#,
+                x,
+                margin,
+                x,
+                margin + plot_height
+            ));
+            svg.push_str(&format!(
+                r#"<text x="{}" y="{}" class="text axis-label">{:.0}h</text>"#,
+                x,
+                margin + plot_height + 20.0,
+                hours
+            ));
+        }
+    }
+
+    // Axis labels
+    svg.push_str(&format!(
+        r#"<text x="{}" y="{}" class="text axis-label">Cumulative Playtime (hours)</text>"#,
+        width / 2.0,
+        height - 10.0
+    ));
+
+    // Rotated Y-axis label
+    svg.push_str(&format!(
+        r#"<text x="20" y="{}" class="text axis-label" transform="rotate(-90, 20, {})">LP</text>"#,
+        height / 2.0,
+        height / 2.0
+    ));
+
+    // LP line
+    if !play_points.is_empty() {
+        let mut path_data = String::from("M");
+        for (i, point) in play_points.iter().enumerate() {
+            if let Some(lp) = point.lp_estimate {
+                let x = margin + (point.cum_hours * x_scale);
+                let y = margin + plot_height - (lp as f64 * y_scale);
+                if i == 0 {
+                    path_data.push_str(&format!("{:.2},{:.2}", x, y));
+                } else {
+                    path_data.push_str(&format!(" L{:.2},{:.2}", x, y));
+                }
+            }
+        }
+        svg.push_str(&format!(r#"<path d="{}" class="lp-line"/>"#, path_data));
+
+        // Win/loss points
+        for point in play_points {
+            if let Some(lp) = point.lp_estimate {
+                let x = margin + (point.cum_hours * x_scale);
+                let y = margin + plot_height - (lp as f64 * y_scale);
+                let class = if point.won { "win-point" } else { "loss-point" };
+                svg.push_str(&format!(
+                    r#"<circle cx="{:.2}" cy="{:.2}" r="3" class="{}"/>"#,
+                    x, y, class
+                ));
+            }
+        }
+    }
+
+    // Legend
+    svg.push_str(&format!(
+        "<rect x=\"{}\" y=\"60\" width=\"160\" height=\"80\" fill=\"white\" stroke=\"#ccc\" stroke-width=\"1\"/>",
+        width - 200.0
+    ));
+    svg.push_str(&format!(
+        r#"<line x1="{}" y1="80" x2="{}" y2="80" class="lp-line"/>"#,
+        width - 190.0,
+        width - 160.0
+    ));
+    svg.push_str(&format!(
+        r#"<text x="{}" y="85" class="text axis-label" text-anchor="start">Estimated LP</text>"#,
+        width - 155.0
+    ));
+    svg.push_str(&format!(
+        r#"<circle cx="{}" cy="100" r="3" class="win-point"/>"#,
+        width - 180.0
+    ));
+    svg.push_str(&format!(
+        r#"<text x="{}" y="105" class="text axis-label" text-anchor="start">Win</text>"#,
+        width - 170.0
+    ));
+    svg.push_str(&format!(
+        r#"<circle cx="{}" cy="120" r="3" class="loss-point"/>"#,
+        width - 180.0
+    ));
+    svg.push_str(&format!(
+        r#"<text x="{}" y="125" class="text axis-label" text-anchor="start">Loss</text>"#,
+        width - 170.0
+    ));
+
+    svg.push_str("</svg>");
+    Ok(svg)
 }
 
 async fn fetch_player_data(

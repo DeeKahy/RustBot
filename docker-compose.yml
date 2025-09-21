@@ -11,6 +11,7 @@ services:
     # Environment variables - these will be overridden by CasaOS
     environment:
       - DISCORD_TOKEN=${DISCORD_TOKEN:-}
+      - RIOT_API_KEY=${RIOT_API_KEY:-}
       - RUST_LOG=${RUST_LOG:-info}
       - RUST_BACKTRACE=${RUST_BACKTRACE:-1}
       - PROTECTED_USERS=${PROTECTED_USERS:-deekahy}
