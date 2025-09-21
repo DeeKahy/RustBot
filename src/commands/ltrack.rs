@@ -3,6 +3,7 @@ use anyhow::{anyhow, Result as AnyhowResult};
 use chrono::{DateTime, Utc};
 use governor::{Quota, RateLimiter};
 use indicatif::{ProgressBar, ProgressStyle};
+use moka::future::Cache;
 use reqwest::Client;
 use serde::Deserialize;
 use std::num::NonZeroU32;
@@ -29,7 +30,35 @@ static RATE_LIMITER: once_cell::sync::Lazy<
     ))
 });
 
-#[derive(Debug, Deserialize)]
+// Cache for individual match data (matches don't change once completed)
+static MATCH_CACHE: once_cell::sync::Lazy<Cache<String, Match>> =
+    once_cell::sync::Lazy::new(|| {
+        Cache::builder()
+            .max_capacity(10_000) // Cache up to 10k matches
+            .time_to_live(std::time::Duration::from_secs(86400 * 7)) // 7 days
+            .build()
+    });
+
+// Cache for player data (summoner info, league entries, match lists)
+static PLAYER_CACHE: once_cell::sync::Lazy<Cache<String, CachedPlayerData>> =
+    once_cell::sync::Lazy::new(|| {
+        Cache::builder()
+            .max_capacity(1_000) // Cache up to 1k players
+            .time_to_live(std::time::Duration::from_secs(3600)) // 1 hour
+            .build()
+    });
+
+#[derive(Debug, Clone)]
+struct CachedPlayerData {
+    summoner: Summoner,
+    league_entries: Vec<LeagueEntry>,
+    account: RiotAccount,
+    matches: Vec<Match>,
+    last_updated: DateTime<Utc>,
+    oldest_match_timestamp: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
 #[allow(dead_code)]
 struct Summoner {
     #[serde(rename = "accountId")]
@@ -45,7 +74,7 @@ struct Summoner {
     summoner_level: Option<i64>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[allow(dead_code)]
 struct RiotAccount {
     puuid: String,
@@ -55,7 +84,7 @@ struct RiotAccount {
     tag_line: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[allow(dead_code)]
 struct LeagueEntry {
     #[serde(rename = "leagueId")]
@@ -80,7 +109,7 @@ struct LeagueEntry {
     inactive: bool,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 struct MatchInfo {
     #[serde(rename = "gameDuration")]
     game_duration: i64,
@@ -91,7 +120,7 @@ struct MatchInfo {
     participants: Vec<Participant>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[allow(dead_code)]
 struct Participant {
     puuid: String,
@@ -103,7 +132,7 @@ struct Participant {
     assists: i32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[allow(dead_code)]
 struct Match {
     #[serde(rename = "metadata")]
@@ -111,7 +140,7 @@ struct Match {
     info: MatchInfo,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[allow(dead_code)]
 struct MatchMetadata {
     #[serde(rename = "matchId")]
@@ -387,25 +416,99 @@ async fn fetch_player_data(
     ctx: &Context<'_>,
     reply: &poise::ReplyHandle<'_>,
 ) -> AnyhowResult<(Summoner, Vec<LeagueEntry>, Vec<PlayPoint>, RiotAccount)> {
-    // Get account info using Riot ID
-    let account = client.get_account_by_riot_id(game_name, tag_line).await?;
+    let cache_key = format!("{}#{}:{}", game_name, tag_line, client.platform);
+    let target_cutoff_time =
+        Utc::now() - chrono::Duration::milliseconds((max_duration_hours * 3600.0 * 1000.0) as i64);
 
-    // Get summoner info using PUUID
-    let summoner = client.get_summoner_by_puuid(&account.puuid).await?;
+    // Check if we have cached data
+    let cached_data = PLAYER_CACHE.get(&cache_key).await;
+    let mut needs_fresh_account_data = false;
+    let use_cache: bool;
 
-    // Get current rank
-    let league_entries = client
-        .get_league_entries(&account.puuid)
-        .await
-        .unwrap_or_else(|e| {
-            log::warn!("Failed to get league entries: {}", e);
-            Vec::new()
-        });
+    // Determine what data we need to fetch
+    if let Some(ref cache) = cached_data {
+        // Check if cached data is sufficient
+        if cache.oldest_match_timestamp <= target_cutoff_time {
+            // We have enough old data, just need to check for new matches
+            log::info!(
+                "Cache hit: Using cached data for {} (last updated: {}, {} matches cached)",
+                cache_key,
+                cache.last_updated.format("%Y-%m-%d %H:%M:%S"),
+                cache.matches.len()
+            );
+            use_cache = true;
+        } else {
+            // Need to fetch more historical data
+            log::info!(
+                "Cache partial: Need more historical data for {} (oldest cached: {}, target cutoff: {})",
+                cache_key,
+                cache.oldest_match_timestamp.format("%Y-%m-%d %H:%M:%S"),
+                target_cutoff_time.format("%Y-%m-%d %H:%M:%S")
+            );
+            use_cache = false;
+        }
 
-    // Fetch matches until we hit target hours
-    let mut all_matches = Vec::new();
+        // Check if account data is stale (refresh every 30 minutes for rank updates)
+        if cache.last_updated < Utc::now() - chrono::Duration::minutes(30) {
+            needs_fresh_account_data = true;
+        }
+    } else {
+        log::info!("Cache miss: No cached data for {}", cache_key);
+        needs_fresh_account_data = true;
+        use_cache = false;
+    }
+    // Get fresh account/summoner/rank data if needed
+    let (account, summoner, league_entries) = if needs_fresh_account_data {
+        let account = client.get_account_by_riot_id(game_name, tag_line).await?;
+        let summoner = client.get_summoner_by_puuid(&account.puuid).await?;
+        let league_entries = client
+            .get_league_entries(&account.puuid)
+            .await
+            .unwrap_or_else(|e| {
+                log::warn!("Failed to get league entries: {}", e);
+                Vec::new()
+            });
+        (account, summoner, league_entries)
+    } else if use_cache && cached_data.is_some() {
+        let cache = cached_data.as_ref().unwrap();
+        (
+            cache.account.clone(),
+            cache.summoner.clone(),
+            cache.league_entries.clone(),
+        )
+    } else {
+        // This shouldn't happen, but fallback to fresh data
+        let account = client.get_account_by_riot_id(game_name, tag_line).await?;
+        let summoner = client.get_summoner_by_puuid(&account.puuid).await?;
+        let league_entries = client
+            .get_league_entries(&account.puuid)
+            .await
+            .unwrap_or_else(|e| {
+                log::warn!("Failed to get league entries for {}: {}", cache_key, e);
+                Vec::new()
+            });
+        (account, summoner, league_entries)
+    };
+
+    // Get matches (use cache when possible)
+    let mut all_matches = if use_cache && cached_data.is_some() {
+        // Start with cached matches
+        cached_data.unwrap().matches.clone()
+    } else {
+        Vec::new()
+    };
+
+    // Determine if we need to fetch new matches
+    let latest_cached_timestamp = all_matches
+        .iter()
+        .map(|m| m.info.game_end_timestamp)
+        .max()
+        .unwrap_or(0);
+
+    // Fetch new matches if needed
     let mut start = 0;
-    let mut total_duration_hours = 0.0;
+    let mut new_matches_count = 0;
+    let should_fetch_more = true;
 
     let progress = ProgressBar::new_spinner();
     progress.set_style(
@@ -414,11 +517,13 @@ async fn fetch_player_data(
             .unwrap(),
     );
 
-    while total_duration_hours < max_duration_hours && start < 2000 {
-        let progress_msg = format!(
-            "Fetching matches... {:.1}h/{:.1}h",
-            total_duration_hours, max_duration_hours
-        );
+    while should_fetch_more && start < 2000 {
+        let progress_msg = if all_matches.is_empty() {
+            format!("Fetching match history...")
+        } else {
+            format!("Checking for new matches... ({} cached)", all_matches.len())
+        };
+
         progress.set_message(progress_msg.clone());
 
         // Update Discord message
@@ -438,34 +543,115 @@ async fn fetch_player_data(
             break;
         }
 
+        let mut found_cached_match = false;
         for match_id in match_ids {
-            let match_data = client.get_match_details(&match_id).await?;
-            let duration_hours = match_data.info.game_duration as f64 / 3600.0;
-            total_duration_hours += duration_hours;
-            all_matches.push(match_data);
+            // Check if we already have this match in cache
+            if let Some(cached_match) = MATCH_CACHE.get(&match_id).await {
+                if cached_match.info.game_end_timestamp <= latest_cached_timestamp {
+                    found_cached_match = true;
+                    continue; // Skip matches we already have
+                }
+                log::debug!("Using cached match: {}", match_id);
+                all_matches.push(cached_match);
+                new_matches_count += 1;
+            } else {
+                // Fetch new match data
+                log::debug!("Fetching new match: {}", match_id);
+                let match_data = client.get_match_details(&match_id).await?;
 
-            if total_duration_hours >= max_duration_hours {
-                break;
+                // Cache the match for future use
+                MATCH_CACHE
+                    .insert(match_id.clone(), match_data.clone())
+                    .await;
+
+                if match_data.info.game_end_timestamp <= latest_cached_timestamp {
+                    found_cached_match = true;
+                } else {
+                    all_matches.push(match_data);
+                    new_matches_count += 1;
+                }
             }
+        }
+
+        // If we've found matches we already had cached, we can stop fetching
+        if found_cached_match && new_matches_count > 0 {
+            break;
         }
 
         start += 100;
     }
 
+    // Sort all matches by timestamp
+    all_matches.sort_by_key(|m| m.info.game_end_timestamp);
+
+    // Filter matches to only include those within our time window and calculate duration
+    let mut filtered_matches = Vec::new();
+    let mut total_duration_hours = 0.0;
+
+    // Start from the most recent matches and work backwards
+    for match_data in all_matches.iter().rev() {
+        let duration_hours = match_data.info.game_duration as f64 / 3600.0;
+        if total_duration_hours + duration_hours <= max_duration_hours {
+            total_duration_hours += duration_hours;
+            filtered_matches.push(match_data.clone());
+        } else {
+            break;
+        }
+    }
+
+    // Reverse to get chronological order again
+    filtered_matches.reverse();
+
+    let cache_hit_rate = if start > 0 {
+        ((start - new_matches_count) as f64 / start as f64) * 100.0
+    } else {
+        0.0
+    };
+
     progress.finish_with_message(format!(
-        "Fetched {} matches ({:.1}h total)",
-        all_matches.len(),
-        total_duration_hours
+        "Using {} matches ({} new, {:.1}h total, {:.1}% cache hit rate)",
+        filtered_matches.len(),
+        new_matches_count,
+        total_duration_hours,
+        cache_hit_rate
     ));
 
-    // Build play points
+    log::info!(
+        "Match processing complete for {}: {} total matches, {} new fetches, {:.1}% cache efficiency",
+        cache_key,
+        filtered_matches.len(),
+        new_matches_count,
+        cache_hit_rate
+    );
+
+    // Update cache with new data
+    if !filtered_matches.is_empty() {
+        let oldest_timestamp = DateTime::from_timestamp(
+            filtered_matches.first().unwrap().info.game_end_timestamp / 1000,
+            0,
+        )
+        .unwrap_or_else(|| Utc::now());
+
+        let cached_player_data = CachedPlayerData {
+            summoner: summoner.clone(),
+            league_entries: league_entries.clone(),
+            account: account.clone(),
+            matches: all_matches, // Store all matches, not just filtered ones
+            last_updated: Utc::now(),
+            oldest_match_timestamp: oldest_timestamp,
+        };
+
+        PLAYER_CACHE
+            .insert(cache_key.clone(), cached_player_data)
+            .await;
+        log::info!("Updated cache for player: {}", cache_key);
+    }
+
+    // Build play points from filtered matches
     let mut play_points = Vec::new();
     let mut cumulative_hours = 0.0;
 
-    // Sort matches by timestamp
-    all_matches.sort_by_key(|m| m.info.game_end_timestamp);
-
-    for match_data in all_matches {
+    for match_data in filtered_matches {
         if let Some(participant) = match_data
             .info
             .participants
@@ -711,6 +897,91 @@ pub async fn ltrack(
             reply
                 .edit(ctx, poise::CreateReply::default().content(error_msg))
                 .await?;
+        }
+    }
+
+    Ok(())
+}
+
+/// View cache statistics and manage the ltrack cache
+///
+/// This command allows you to see how the caching system is performing
+/// and optionally clear cached data.
+///
+/// # Usage
+/// - `-cache_stats` - View current cache statistics
+/// - `-cache_stats clear` - Clear all cached data
+///
+/// # Features
+/// - Shows match cache hit counts and memory usage
+/// - Shows player cache statistics
+/// - Allows clearing cache to force fresh data fetching
+#[poise::command(prefix_command, slash_command, owners_only)]
+pub async fn cache_stats(
+    ctx: Context<'_>,
+    #[description = "Action to perform (clear to clear cache)"] action: Option<String>,
+) -> Result<(), Error> {
+    match action.as_deref() {
+        Some("clear") => {
+            // Clear both caches
+            MATCH_CACHE.invalidate_all();
+            PLAYER_CACHE.invalidate_all();
+
+            // Wait for invalidation to complete
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+            ctx.say("🗑️ **Cache Cleared**\nAll cached match and player data has been cleared. Next ltrack commands will fetch fresh data from Riot API.").await?;
+            log::info!("Cache cleared by user command");
+        }
+        _ => {
+            // Show cache statistics
+            let match_cache_size = MATCH_CACHE.entry_count();
+            let match_cache_weight = MATCH_CACHE.weighted_size();
+            let player_cache_size = PLAYER_CACHE.entry_count();
+            let player_cache_weight = PLAYER_CACHE.weighted_size();
+
+            // Run sync to get accurate stats
+            MATCH_CACHE.run_pending_tasks().await;
+            PLAYER_CACHE.run_pending_tasks().await;
+
+            let embed = poise::serenity_prelude::CreateEmbed::new()
+                .title("📊 Cache Statistics")
+                .color(0x00ff00)
+                .field(
+                    "🎮 Match Cache",
+                    format!(
+                        "**Entries:** {}\n**Memory Weight:** {}\n**Max Capacity:** 10,000\n**TTL:** 7 days",
+                        match_cache_size,
+                        match_cache_weight
+                    ),
+                    true,
+                )
+                .field(
+                    "👤 Player Cache",
+                    format!(
+                        "**Entries:** {}\n**Memory Weight:** {}\n**Max Capacity:** 1,000\n**TTL:** 1 hour",
+                        player_cache_size,
+                        player_cache_weight
+                    ),
+                    true,
+                )
+                .field(
+                    "💡 Cache Benefits",
+                    "• Reduces API calls to Riot\n• Faster response times\n• Efficient for repeated queries\n• Automatic expiration",
+                    false,
+                )
+                .footer(poise::serenity_prelude::CreateEmbedFooter::new(
+                    "Use `-cache_stats clear` to clear all cached data"
+                ))
+                .timestamp(chrono::Utc::now());
+
+            ctx.send(poise::CreateReply::default().embed(embed)).await?;
+
+            log::info!(
+                "Cache stats requested - Match cache: {} entries, Player cache: {} entries",
+                match_cache_size,
+                player_cache_size
+            );
         }
     }
 

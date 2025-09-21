@@ -43,7 +43,7 @@ pub use help::help;
 pub use hit::hit;
 pub use invite::invite;
 pub use kys::kys;
-pub use ltrack::ltrack;
+pub use ltrack::{cache_stats, ltrack};
 pub use mock::mock;
 pub use number_guess::{endgame, gamestatus, guess, hint, numberguess};
 pub use park::{park, start_parking_scheduler};
