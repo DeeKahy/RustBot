@@ -23,9 +23,9 @@ static RATE_LIMITER: once_cell::sync::Lazy<
     >,
 > = once_cell::sync::Lazy::new(|| {
     Arc::new(RateLimiter::direct(
-        Quota::with_period(Duration::from_secs(120))
+        Quota::with_period(Duration::from_secs(60))
             .unwrap()
-            .allow_burst(NonZeroU32::new(100).unwrap()),
+            .allow_burst(NonZeroU32::new(200).unwrap()),
     ))
 });
 
@@ -494,6 +494,8 @@ async fn fetch_player_data(
     game_name: &str,
     tag_line: &str,
     max_duration_hours: f64,
+    ctx: &Context<'_>,
+    reply: &poise::ReplyHandle<'_>,
 ) -> AnyhowResult<(Summoner, Vec<LeagueEntry>, Vec<PlayPoint>, RiotAccount)> {
     // Get account info using Riot ID
     let account = client.get_account_by_riot_id(game_name, tag_line).await?;
@@ -523,10 +525,20 @@ async fn fetch_player_data(
     );
 
     while total_duration_hours < max_duration_hours && start < 2000 {
-        progress.set_message(format!(
+        let progress_msg = format!(
             "Fetching matches... {:.1}h/{:.1}h",
             total_duration_hours, max_duration_hours
-        ));
+        );
+        progress.set_message(progress_msg.clone());
+
+        // Update Discord message
+        let _ = reply
+            .edit(
+                *ctx,
+                poise::CreateReply::default()
+                    .content(format!("🔍 **{}** - {}", game_name, progress_msg)),
+            )
+            .await;
 
         let match_ids = client
             .get_match_ids(&summoner.puuid, start, 100, Some(420)) // Ranked Solo queue
@@ -590,18 +602,20 @@ async fn fetch_player_data(
     Ok((summoner, league_entries, play_points, account))
 }
 
-/// Track a League of Legends player's LP progression over their last ~100 hours of ranked playtime
+/// Track a League of Legends player's LP progression over their ranked playtime
 ///
 /// This command fetches a player's recent ranked matches and generates a graph showing
 /// their estimated LP progression over cumulative playtime. The LP estimates are based
 /// on win/loss patterns and typical LP gains/losses.
 ///
 /// # Usage
-/// - `-ltrack SummonerName` - Track player on EUW (default)
-/// - `-ltrack SummonerName NA1` - Track player on specified region
+/// - `-ltrack Faker#KR1` - Track player with 20 hours (default)
+/// - `-ltrack Faker#KR1 EUW1` - Track player on specified region
+/// - `-ltrack Faker#KR1 EUW1 50` - Track player with 50 hours of history
+/// - `-ltrack Player#TAG NA1 10` - Quick 10-hour analysis
 ///
 /// # Features
-/// - Fetches ~100 hours of ranked Solo/Duo gameplay
+/// - Fetches configurable hours of ranked Solo/Duo gameplay (1-200 hours)
 /// - Estimates LP progression based on win/loss patterns
 /// - Generates SVG chart showing LP vs playtime
 /// - Shows current rank and recent performance stats
@@ -614,6 +628,7 @@ pub async fn ltrack(
     ctx: Context<'_>,
     #[description = "Riot ID (GameName#TagLine) to track"] riot_id: String,
     #[description = "Platform (default: EUW1)"] platform: Option<String>,
+    #[description = "Hours of match history to analyze (default: 20)"] hours: Option<f64>,
 ) -> Result<(), Error> {
     let api_key = env::var("RIOT_API_KEY")
         .map_err(|_| "❌ RIOT_API_KEY not found in environment variables")?;
@@ -643,6 +658,7 @@ pub async fn ltrack(
     };
 
     let client = RiotClient::new(api_key, platform.clone(), region.to_string());
+    let target_hours = hours.unwrap_or(20.0).max(1.0).min(200.0); // Clamp between 1 and 200 hours
 
     // Parse Riot ID (GameName#TagLine)
     let parts: Vec<&str> = riot_id.split('#').collect();
@@ -656,7 +672,7 @@ pub async fn ltrack(
         .say(format!("🔍 Fetching data for **{}**...", riot_id))
         .await?;
 
-    match fetch_player_data(&client, game_name, tag_line, 100.0).await {
+    match fetch_player_data(&client, game_name, tag_line, target_hours, &ctx, &reply).await {
         Ok((summoner, league_entries, mut play_points, account)) => {
             if play_points.is_empty() {
                 reply
