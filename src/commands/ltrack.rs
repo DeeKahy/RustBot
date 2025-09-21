@@ -478,7 +478,7 @@ async fn fetch_player_data(
     game_name: &str,
     tag_line: &str,
     max_duration_hours: f64,
-) -> AnyhowResult<(Summoner, Vec<LeagueEntry>, Vec<PlayPoint>)> {
+) -> AnyhowResult<(Summoner, Vec<LeagueEntry>, Vec<PlayPoint>, RiotAccount)> {
     // Get account info using Riot ID
     let account = client.get_account_by_riot_id(game_name, tag_line).await?;
 
@@ -565,7 +565,7 @@ async fn fetch_player_data(
         }
     }
 
-    Ok((summoner, league_entries, play_points))
+    Ok((summoner, league_entries, play_points, account))
 }
 
 /// Track a League of Legends player's LP progression over their last ~100 hours of ranked playtime
@@ -635,7 +635,7 @@ pub async fn ltrack(
         .await?;
 
     match fetch_player_data(&client, game_name, tag_line, 100.0).await {
-        Ok((summoner, league_entries, mut play_points)) => {
+        Ok((summoner, league_entries, mut play_points, account)) => {
             if play_points.is_empty() {
                 reply
                     .edit(
@@ -735,8 +735,8 @@ pub async fn ltrack(
             let error_msg = if e.to_string().contains("404") || e.to_string().contains("Not Found")
             {
                 format!(
-                    "❌ Summoner '{}' not found on {}. Please check the spelling and region.",
-                    summoner_name,
+                    "❌ Riot ID '{}' not found on {}. Please check the spelling and region.",
+                    riot_id,
                     platform.to_uppercase()
                 )
             } else if e.to_string().contains("403")
