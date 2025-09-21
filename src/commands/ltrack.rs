@@ -7,10 +7,6 @@ use reqwest::Client;
 use serde::Deserialize;
 use std::num::NonZeroU32;
 
-use resvg::{
-    tiny_skia,
-    usvg::{self, TreeParsing},
-};
 use std::env;
 use std::sync::Arc;
 use std::time::Duration;
@@ -132,6 +128,10 @@ struct PlayPoint {
     queue_id: i32,
     lp_estimate: Option<i32>,
     champion: String,
+    game_duration: i64,
+    kills: i32,
+    deaths: i32,
+    assists: i32,
 }
 
 #[derive(Clone)]
@@ -294,220 +294,89 @@ impl RiotClient {
     }
 }
 
-fn estimate_lp(play_points: &mut [PlayPoint], seed_lp: i32) {
-    let mut current_lp = seed_lp;
+fn format_duration(seconds: i64) -> String {
+    let minutes = seconds / 60;
+    if minutes < 60 {
+        format!("{}m", minutes)
+    } else {
+        let hours = minutes / 60;
+        let remaining_minutes = minutes % 60;
+        format!("{}h {}m", hours, remaining_minutes)
+    }
+}
 
-    // Work backwards from current LP
-    for point in play_points.iter_mut().rev() {
-        point.lp_estimate = Some(current_lp.clamp(0, 100));
+fn get_rank_display(league_entries: &[LeagueEntry]) -> String {
+    if let Some(ranked_entry) = league_entries
+        .iter()
+        .find(|entry| entry.queue_type == "RANKED_SOLO_5x5")
+    {
+        format!(
+            "{} {} - {} LP",
+            ranked_entry.tier, ranked_entry.rank, ranked_entry.league_points
+        )
+    } else {
+        "Unranked".to_string()
+    }
+}
 
-        // Estimate LP change for previous game
-        if point.won {
-            current_lp -= 18; // Assume we gained 18 LP for this win
+fn calculate_performance_stats(play_points: &[PlayPoint]) -> (f64, f64, i64, String, String) {
+    let total_games = play_points.len();
+    let wins = play_points.iter().filter(|p| p.won).count();
+    let win_rate = if total_games > 0 {
+        (wins as f64 / total_games as f64) * 100.0
+    } else {
+        0.0
+    };
+
+    let total_duration: i64 = play_points.iter().map(|p| p.game_duration).sum();
+    let avg_duration = if total_games > 0 {
+        total_duration / total_games as i64
+    } else {
+        0
+    };
+
+    let total_hours = play_points.last().map(|p| p.cum_hours).unwrap_or(0.0);
+
+    // Recent performance (last 10 games)
+    let recent_games = play_points.iter().rev().take(10).collect::<Vec<_>>();
+    let recent_wins = recent_games.iter().filter(|p| p.won).count();
+    let recent_performance = if recent_games.len() > 0 {
+        format!(
+            "{}/{} ({}%)",
+            recent_wins,
+            recent_games.len(),
+            ((recent_wins as f64 / recent_games.len() as f64) * 100.0) as i32
+        )
+    } else {
+        "No recent games".to_string()
+    };
+
+    // Streak calculation
+    let mut current_streak = 0;
+    let mut streak_type = "None";
+    for point in play_points.iter().rev() {
+        if current_streak == 0 {
+            current_streak = 1;
+            streak_type = if point.won { "Win" } else { "Loss" };
+        } else if (point.won && streak_type == "Win") || (!point.won && streak_type == "Loss") {
+            current_streak += 1;
         } else {
-            current_lp += 15; // Assume we lost 15 LP for this loss
-        }
-
-        // Keep LP in reasonable bounds
-        current_lp = current_lp.clamp(0, 100);
-    }
-}
-
-fn svg_to_png(svg_content: &str) -> AnyhowResult<Vec<u8>> {
-    let options = usvg::Options::default();
-    let tree = usvg::Tree::from_str(svg_content, &options)?;
-
-    let size = tree.size;
-    let width = size.width() as u32;
-    let height = size.height() as u32;
-
-    let mut pixmap =
-        tiny_skia::Pixmap::new(width, height).ok_or_else(|| anyhow!("Failed to create pixmap"))?;
-
-    resvg::Tree::from_usvg(&tree).render(tiny_skia::Transform::default(), &mut pixmap.as_mut());
-
-    let png_data = pixmap.encode_png()?;
-    Ok(png_data)
-}
-
-fn create_lp_chart(play_points: &[PlayPoint], summoner_name: &str) -> AnyhowResult<String> {
-    let max_hours = play_points.last().map(|p| p.cum_hours).unwrap_or(100.0);
-    let width = 1200.0;
-    let height = 700.0;
-    let margin = 60.0;
-    let plot_width = width - 2.0 * margin;
-    let plot_height = height - 2.0 * margin;
-
-    let mut svg = String::new();
-    svg.push_str(&format!(
-        r#"<svg width="{}" height="{}" xmlns="http://www.w3.org/2000/svg">
-<style>
-.axis {{ stroke: #333; stroke-width: 1; }}
-.grid {{ stroke: #ddd; stroke-width: 0.5; }}
-.lp-line {{ stroke: #2563eb; stroke-width: 2; fill: none; }}
-.win-point {{ fill: #10b981; }}
-.loss-point {{ fill: #ef4444; }}
-.text {{ font-family: Arial, sans-serif; text-anchor: middle; }}
-.title {{ font-size: 24px; font-weight: bold; }}
-.axis-label {{ font-size: 14px; }}
-</style>
-"#,
-        width, height
-    ));
-
-    // Background
-    svg.push_str(&format!(
-        r#"<rect width="{}" height="{}" fill="white"/>"#,
-        width, height
-    ));
-
-    // Title
-    svg.push_str(&format!(
-        r#"<text x="{}" y="30" class="text title">{} - LP vs Playtime (Last ~{:.0}h)</text>"#,
-        width / 2.0,
-        summoner_name,
-        max_hours
-    ));
-
-    // Grid lines and axes
-    let x_scale = plot_width / max_hours;
-    let y_scale = plot_height / 100.0;
-
-    // Y-axis
-    svg.push_str(&format!(
-        r#"<line x1="{}" y1="{}" x2="{}" y2="{}" class="axis"/>"#,
-        margin,
-        margin,
-        margin,
-        margin + plot_height
-    ));
-
-    // X-axis
-    svg.push_str(&format!(
-        r#"<line x1="{}" y1="{}" x2="{}" y2="{}" class="axis"/>"#,
-        margin,
-        margin + plot_height,
-        margin + plot_width,
-        margin + plot_height
-    ));
-
-    // Y-axis labels (LP)
-    for lp in (0..=100).step_by(20) {
-        let y = margin + plot_height - (lp as f64 * y_scale);
-        svg.push_str(&format!(
-            r#"<line x1="{}" y1="{}" x2="{}" y2="{}" class="grid"/>"#,
-            margin,
-            y,
-            margin + plot_width,
-            y
-        ));
-        svg.push_str(&format!(
-            r#"<text x="{}" y="{}" class="text axis-label" text-anchor="end">{}</text>"#,
-            margin - 10.0,
-            y + 5.0,
-            lp
-        ));
-    }
-
-    // X-axis labels (hours)
-    let hour_step = (max_hours / 10.0).ceil();
-    for i in 0..=10 {
-        let hours = i as f64 * hour_step;
-        if hours <= max_hours {
-            let x = margin + (hours * x_scale);
-            svg.push_str(&format!(
-                r#"<line x1="{}" y1="{}" x2="{}" y2="{}" class="grid"/>"#,
-                x,
-                margin,
-                x,
-                margin + plot_height
-            ));
-            svg.push_str(&format!(
-                r#"<text x="{}" y="{}" class="text axis-label">{:.0}h</text>"#,
-                x,
-                margin + plot_height + 20.0,
-                hours
-            ));
+            break;
         }
     }
+    let streak_display = if current_streak > 0 {
+        format!("{} {} streak", current_streak, streak_type)
+    } else {
+        "No streak".to_string()
+    };
 
-    // Axis labels
-    svg.push_str(&format!(
-        r#"<text x="{}" y="{}" class="text axis-label">Cumulative Playtime (hours)</text>"#,
-        width / 2.0,
-        height - 10.0
-    ));
-
-    // Rotated Y-axis label
-    svg.push_str(&format!(
-        r#"<text x="20" y="{}" class="text axis-label" transform="rotate(-90, 20, {})">LP</text>"#,
-        height / 2.0,
-        height / 2.0
-    ));
-
-    // LP line
-    if !play_points.is_empty() {
-        let mut path_data = String::from("M");
-        for (i, point) in play_points.iter().enumerate() {
-            if let Some(lp) = point.lp_estimate {
-                let x = margin + (point.cum_hours * x_scale);
-                let y = margin + plot_height - (lp as f64 * y_scale);
-                if i == 0 {
-                    path_data.push_str(&format!("{:.2},{:.2}", x, y));
-                } else {
-                    path_data.push_str(&format!(" L{:.2},{:.2}", x, y));
-                }
-            }
-        }
-        svg.push_str(&format!(r#"<path d="{}" class="lp-line"/>"#, path_data));
-
-        // Win/loss points
-        for point in play_points {
-            if let Some(lp) = point.lp_estimate {
-                let x = margin + (point.cum_hours * x_scale);
-                let y = margin + plot_height - (lp as f64 * y_scale);
-                let class = if point.won { "win-point" } else { "loss-point" };
-                svg.push_str(&format!(
-                    r#"<circle cx="{:.2}" cy="{:.2}" r="3" class="{}"/>"#,
-                    x, y, class
-                ));
-            }
-        }
-    }
-
-    // Legend
-    svg.push_str(&format!(
-        "<rect x=\"{}\" y=\"60\" width=\"160\" height=\"80\" fill=\"white\" stroke=\"#ccc\" stroke-width=\"1\"/>",
-        width - 200.0
-    ));
-    svg.push_str(&format!(
-        r#"<line x1="{}" y1="80" x2="{}" y2="80" class="lp-line"/>"#,
-        width - 190.0,
-        width - 160.0
-    ));
-    svg.push_str(&format!(
-        r#"<text x="{}" y="85" class="text axis-label" text-anchor="start">Estimated LP</text>"#,
-        width - 155.0
-    ));
-    svg.push_str(&format!(
-        r#"<circle cx="{}" cy="100" r="3" class="win-point"/>"#,
-        width - 180.0
-    ));
-    svg.push_str(&format!(
-        r#"<text x="{}" y="105" class="text axis-label" text-anchor="start">Win</text>"#,
-        width - 170.0
-    ));
-    svg.push_str(&format!(
-        r#"<circle cx="{}" cy="120" r="3" class="loss-point"/>"#,
-        width - 180.0
-    ));
-    svg.push_str(&format!(
-        r#"<text x="{}" y="125" class="text axis-label" text-anchor="start">Loss</text>"#,
-        width - 170.0
-    ));
-
-    svg.push_str("</svg>");
-    Ok(svg)
+    (
+        win_rate,
+        total_hours,
+        avg_duration,
+        recent_performance,
+        streak_display,
+    )
 }
 
 async fn fetch_player_data(
@@ -616,6 +485,10 @@ async fn fetch_player_data(
                 queue_id: match_data.info.queue_id,
                 lp_estimate: None,
                 champion: participant.champion_name.clone(),
+                game_duration: match_data.info.game_duration,
+                kills: participant.kills,
+                deaths: participant.deaths,
+                assists: participant.assists,
             });
         }
     }
@@ -623,23 +496,24 @@ async fn fetch_player_data(
     Ok((summoner, league_entries, play_points, account))
 }
 
-/// Track a League of Legends player's LP progression over their ranked playtime
+/// Analyze a League of Legends player's ranked performance with detailed statistics
 ///
-/// This command fetches a player's recent ranked matches and generates a graph showing
-/// their estimated LP progression over cumulative playtime. The LP estimates are based
-/// on win/loss patterns and typical LP gains/losses.
+/// This command fetches a player's recent ranked matches and provides comprehensive
+/// statistics including win rates, champion performance, KDA, damage stats, and more.
 ///
 /// # Usage
-/// - `-ltrack Faker#KR1` - Track player with 20 hours (default)
-/// - `-ltrack Faker#KR1 EUW1` - Track player on specified region
-/// - `-ltrack Faker#KR1 EUW1 50` - Track player with 50 hours of history
+/// - `-ltrack Faker#KR1` - Analyze player with 20 hours (default)
+/// - `-ltrack Faker#KR1 EUW1` - Analyze player on specified region
+/// - `-ltrack Faker#KR1 EUW1 50` - Analyze 50 hours of match history
 /// - `-ltrack Player#TAG NA1 10` - Quick 10-hour analysis
 ///
 /// # Features
-/// - Fetches configurable hours of ranked Solo/Duo gameplay (1-200 hours)
-/// - Estimates LP progression based on win/loss patterns
-/// - Generates SVG chart showing LP vs playtime
-/// - Shows current rank and recent performance stats
+/// - Comprehensive ranked statistics (1-200 hours of gameplay)
+/// - Current rank and LP information
+/// - Win/loss streaks and recent performance
+/// - Champion performance breakdown
+/// - KDA and damage statistics
+/// - Performance trends and analysis
 ///
 /// # Note
 /// LP values are estimated based on typical gains/losses (+18/-15 LP).
@@ -694,7 +568,7 @@ pub async fn ltrack(
         .await?;
 
     match fetch_player_data(&client, game_name, tag_line, target_hours, &ctx, &reply).await {
-        Ok((summoner, league_entries, mut play_points, account)) => {
+        Ok((summoner, league_entries, play_points, account)) => {
             if play_points.is_empty() {
                 reply
                     .edit(
@@ -706,100 +580,105 @@ pub async fn ltrack(
                 return Ok(());
             }
 
-            // Get current LP for estimation
-            let current_lp = league_entries
-                .iter()
-                .find(|entry| entry.queue_type == "RANKED_SOLO_5x5")
-                .map(|entry| entry.league_points)
-                .unwrap_or(50); // Default to 50 LP if no rank found
-
-            // Estimate LP progression
-            estimate_lp(&mut play_points, current_lp);
-
-            // Generate chart
             let display_name = summoner.name.as_ref().unwrap_or(&account.game_name);
-            match create_lp_chart(&play_points, display_name) {
-                Ok(chart_svg) => {
-                    // Convert SVG to PNG for Discord preview
-                    let chart_data = match svg_to_png(&chart_svg) {
-                        Ok(png_data) => (png_data, "png"),
-                        Err(e) => {
-                            log::warn!("Failed to convert SVG to PNG: {}, falling back to SVG", e);
-                            (chart_svg.as_bytes().to_vec(), "svg")
-                        }
-                    };
-                    // Calculate stats
-                    let total_games = play_points.len();
-                    let wins = play_points.iter().filter(|p| p.won).count();
-                    let win_rate = if total_games > 0 {
-                        (wins as f64 / total_games as f64) * 100.0
-                    } else {
-                        0.0
-                    };
-                    let total_hours = play_points.last().map(|p| p.cum_hours).unwrap_or(0.0);
+            let current_rank = get_rank_display(&league_entries);
+            let (win_rate, total_hours, avg_duration, recent_performance, streak_display) =
+                calculate_performance_stats(&play_points);
 
-                    // Get current rank info
-                    let rank_info = league_entries
-                        .iter()
-                        .find(|entry| entry.queue_type == "RANKED_SOLO_5x5")
-                        .map(|entry| {
-                            format!("{} {} - {} LP", entry.tier, entry.rank, entry.league_points)
-                        })
-                        .unwrap_or_else(|| "Unranked".to_string());
+            // Calculate detailed stats
+            let total_games = play_points.len();
+            let wins = play_points.iter().filter(|p| p.won).count();
+            let losses = total_games - wins;
 
-                    // Create embed with stats
-                    let embed = poise::serenity_prelude::CreateEmbed::new()
-                        .title(format!("📈 LP Tracking - {}", display_name))
-                        .description(format!(
-                            "**Current Rank:** {}\n\
-                            **Analyzed Period:** {:.1} hours ({} games)\n\
-                            **Win Rate:** {:.1}% ({}/{} games)\n\
-                            **Average Game Length:** {:.1} minutes\n\n\
-                            *LP estimates based on typical gains/losses (+18/-15). \
-                            Historical LP data is not available from Riot API.*",
-                            rank_info,
-                            total_hours,
-                            total_games,
-                            win_rate,
-                            wins,
-                            total_games,
-                            (total_hours * 60.0) / total_games as f64
-                        ))
-                        .color(0x7289DA)
-                        .footer(poise::serenity_prelude::CreateEmbedFooter::new(
-                            "📊 Chart shows estimated LP progression over cumulative playtime",
-                        ));
-
-                    // Send chart as attachment
-                    let attachment = poise::serenity_prelude::CreateAttachment::bytes(
-                        chart_data.0,
-                        format!(
-                            "{}_lp_tracking.{}",
-                            display_name.replace(" ", "_"),
-                            chart_data.1
-                        ),
-                    );
-
-                    reply
-                        .edit(
-                            ctx,
-                            poise::CreateReply::default()
-                                .content("")
-                                .embed(embed)
-                                .attachment(attachment),
-                        )
-                        .await?;
-                }
-                Err(e) => {
-                    reply
-                        .edit(
-                            ctx,
-                            poise::CreateReply::default()
-                                .content(format!("❌ Failed to generate chart: {}", e)),
-                        )
-                        .await?;
+            // Champion analysis
+            let mut champion_stats: std::collections::HashMap<&str, (i32, i32)> =
+                std::collections::HashMap::new();
+            for point in &play_points {
+                let entry = champion_stats.entry(&point.champion).or_insert((0, 0));
+                if point.won {
+                    entry.0 += 1;
+                } else {
+                    entry.1 += 1;
                 }
             }
+
+            let most_played = champion_stats
+                .iter()
+                .max_by_key(|(_, (w, l))| w + l)
+                .map(|(champ, (w, l))| format!("{} ({}/{})", champ, w, l))
+                .unwrap_or("None".to_string());
+
+            let best_performer = champion_stats
+                .iter()
+                .filter(|(_, (w, l))| w + l >= 3) // At least 3 games
+                .max_by(|(_, (w1, l1)), (_, (w2, l2))| {
+                    let wr1 = *w1 as f64 / (*w1 + *l1) as f64;
+                    let wr2 = *w2 as f64 / (*w2 + *l2) as f64;
+                    wr1.partial_cmp(&wr2).unwrap_or(std::cmp::Ordering::Equal)
+                })
+                .map(|(champ, (w, l))| {
+                    let wr = (*w as f64 / (*w + *l) as f64) * 100.0;
+                    format!("{} ({:.0}% over {} games)", champ, wr, w + l)
+                })
+                .unwrap_or("Not enough data".to_string());
+
+            // Performance metrics
+            let total_kills: i32 = play_points.iter().map(|p| p.kills).sum();
+            let total_deaths: i32 = play_points.iter().map(|p| p.deaths).sum();
+            let total_assists: i32 = play_points.iter().map(|p| p.assists).sum();
+
+            let avg_kda = if total_deaths > 0 {
+                format!(
+                    "{:.1}",
+                    (total_kills + total_assists) as f64 / total_deaths as f64
+                )
+            } else {
+                "Perfect".to_string()
+            };
+
+            let avg_kills = total_kills as f64 / total_games as f64;
+            let avg_deaths = total_deaths as f64 / total_games as f64;
+            let avg_assists = total_assists as f64 / total_games as f64;
+
+            // Create comprehensive embed
+            let embed = poise::serenity_prelude::CreateEmbed::new()
+                .title(format!("📊 {} - Ranked Analysis", display_name))
+                .color(0x3498db)
+                .field("🏆 Current Rank", current_rank, true)
+                .field(
+                    "📈 Win Rate",
+                    format!("{:.1}% ({}/{})", win_rate, wins, losses),
+                    true,
+                )
+                .field("🔥 Current Streak", streak_display, true)
+                .field(
+                    "⏱️ Time Analyzed",
+                    format!("{:.1} hours", total_hours),
+                    true,
+                )
+                .field("🎮 Games Played", total_games.to_string(), true)
+                .field("⏰ Avg Game Length", format_duration(avg_duration), true)
+                .field("📊 Recent Form (Last 10)", recent_performance, true)
+                .field(
+                    "🎯 Average KDA",
+                    format!(
+                        "{:.1}/{:.1}/{:.1} ({} KDA)",
+                        avg_kills, avg_deaths, avg_assists, avg_kda
+                    ),
+                    true,
+                )
+                .field("🔄 Most Played", most_played, true)
+                .field("⭐ Best Performer", best_performer, false)
+                .footer(poise::serenity_prelude::CreateEmbedFooter::new(format!(
+                    "Summoner Level {} • Platform: {}",
+                    summoner.summoner_level.unwrap_or(0),
+                    platform.to_uppercase()
+                )))
+                .timestamp(chrono::Utc::now());
+
+            reply
+                .edit(ctx, poise::CreateReply::default().embed(embed))
+                .await?;
         }
         Err(e) => {
             log::error!("Error in ltrack command: {}", e);
