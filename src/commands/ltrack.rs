@@ -33,7 +33,7 @@ static RATE_LIMITER: once_cell::sync::Lazy<
 #[allow(dead_code)]
 struct Summoner {
     #[serde(rename = "accountId")]
-    account_id: String,
+    account_id: Option<String>,
     #[serde(rename = "profileIconId")]
     profile_icon_id: i32,
     #[serde(rename = "revisionDate")]
@@ -214,7 +214,11 @@ impl RiotClient {
             }
         }
 
-        let json = response.json::<T>().await?;
+        // Debug: log the response text before trying to parse it
+        let response_text = response.text().await?;
+        log::debug!("API Response for {}: {}", url, response_text);
+
+        let json = serde_json::from_str::<T>(&response_text)?;
         Ok(json)
     }
 
