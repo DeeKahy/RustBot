@@ -7,6 +7,10 @@ use reqwest::Client;
 use serde::Deserialize;
 use std::num::NonZeroU32;
 
+use resvg::{
+    tiny_skia,
+    usvg::{self, TreeParsing},
+};
 use std::env;
 use std::sync::Arc;
 use std::time::Duration;
@@ -307,6 +311,23 @@ fn estimate_lp(play_points: &mut [PlayPoint], seed_lp: i32) {
         // Keep LP in reasonable bounds
         current_lp = current_lp.clamp(0, 100);
     }
+}
+
+fn svg_to_png(svg_content: &str) -> AnyhowResult<Vec<u8>> {
+    let options = usvg::Options::default();
+    let tree = usvg::Tree::from_str(svg_content, &options)?;
+
+    let size = tree.size;
+    let width = size.width() as u32;
+    let height = size.height() as u32;
+
+    let mut pixmap =
+        tiny_skia::Pixmap::new(width, height).ok_or_else(|| anyhow!("Failed to create pixmap"))?;
+
+    resvg::Tree::from_usvg(&tree).render(tiny_skia::Transform::default(), &mut pixmap.as_mut());
+
+    let png_data = pixmap.encode_png()?;
+    Ok(png_data)
 }
 
 fn create_lp_chart(play_points: &[PlayPoint], summoner_name: &str) -> AnyhowResult<String> {
@@ -699,6 +720,14 @@ pub async fn ltrack(
             let display_name = summoner.name.as_ref().unwrap_or(&account.game_name);
             match create_lp_chart(&play_points, display_name) {
                 Ok(chart_svg) => {
+                    // Convert SVG to PNG for Discord preview
+                    let chart_data = match svg_to_png(&chart_svg) {
+                        Ok(png_data) => (png_data, "png"),
+                        Err(e) => {
+                            log::warn!("Failed to convert SVG to PNG: {}, falling back to SVG", e);
+                            (chart_svg.as_bytes().to_vec(), "svg")
+                        }
+                    };
                     // Calculate stats
                     let total_games = play_points.len();
                     let wins = play_points.iter().filter(|p| p.won).count();
@@ -743,8 +772,12 @@ pub async fn ltrack(
 
                     // Send chart as attachment
                     let attachment = poise::serenity_prelude::CreateAttachment::bytes(
-                        chart_svg.as_bytes(),
-                        format!("{}_lp_tracking.svg", display_name.replace(" ", "_")),
+                        chart_data.0,
+                        format!(
+                            "{}_lp_tracking.{}",
+                            display_name.replace(" ", "_"),
+                            chart_data.1
+                        ),
                     );
 
                     reply
