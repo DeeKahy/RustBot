@@ -292,7 +292,19 @@ impl RiotClient {
             "https://{}.api.riotgames.com/lol/league/v4/entries/by-puuid/{}",
             self.platform, puuid
         );
-        self.rate_limited_request(&url).await
+        log::debug!("Fetching league entries from: {}", url);
+        let entries: Vec<LeagueEntry> = self.rate_limited_request(&url).await?;
+        log::debug!("League entries response: {} entries found", entries.len());
+        for entry in &entries {
+            log::debug!(
+                "Entry: queue_type={}, tier={}, rank={}, lp={}",
+                entry.queue_type,
+                entry.tier,
+                entry.rank,
+                entry.league_points
+            );
+        }
+        Ok(entries)
     }
 
     async fn get_match_ids(
@@ -335,15 +347,28 @@ fn format_duration(seconds: i64) -> String {
 }
 
 fn get_rank_display(league_entries: &[LeagueEntry]) -> String {
+    log::debug!(
+        "Processing {} league entries for rank display",
+        league_entries.len()
+    );
     if let Some(ranked_entry) = league_entries
         .iter()
         .find(|entry| entry.queue_type == "RANKED_SOLO_5x5")
     {
-        format!(
+        let rank_str = format!(
             "{} {} - {} LP",
             ranked_entry.tier, ranked_entry.rank, ranked_entry.league_points
-        )
+        );
+        log::debug!("Found RANKED_SOLO_5x5 entry: {}", rank_str);
+        rank_str
     } else {
+        log::warn!(
+            "No RANKED_SOLO_5x5 entry found. Available queue types: {:?}",
+            league_entries
+                .iter()
+                .map(|e| &e.queue_type)
+                .collect::<Vec<_>>()
+        );
         "Unranked".to_string()
     }
 }
@@ -465,7 +490,12 @@ async fn fetch_player_data(
             .get_league_entries(&account.puuid)
             .await
             .unwrap_or_else(|e| {
-                log::warn!("Failed to get league entries: {}", e);
+                log::error!(
+                    "Failed to get league entries for {} (PUUID: {}): {}",
+                    cache_key,
+                    account.puuid,
+                    e
+                );
                 Vec::new()
             });
         (account, summoner, league_entries)
@@ -484,7 +514,12 @@ async fn fetch_player_data(
             .get_league_entries(&account.puuid)
             .await
             .unwrap_or_else(|e| {
-                log::warn!("Failed to get league entries for {}: {}", cache_key, e);
+                log::error!(
+                    "Failed to get league entries for {} (PUUID: {}): {}",
+                    cache_key,
+                    account.puuid,
+                    e
+                );
                 Vec::new()
             });
         (account, summoner, league_entries)
