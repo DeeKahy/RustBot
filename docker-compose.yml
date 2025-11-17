@@ -17,6 +17,13 @@ services:
       - PROTECTED_USERS=${PROTECTED_USERS:-deekahy}
       - GIT_BRANCH=${GIT_BRANCH:-developing}
 
+    # Persistent volumes for data (IMPORTANT: Required for parking & reminders)
+    volumes:
+      # Parking data: encrypted user info, schedules, encryption keys
+      - rustbot-data:/var/lib/rustbot
+      # Reminders data
+      - rustbot-tmp:/tmp
+
     # Resource limits (higher for compilation)
     deploy:
       resources:
@@ -49,6 +56,13 @@ services:
     # Networks
     networks:
       - rustbot-network
+
+# Named volumes for persistent data
+volumes:
+  rustbot-data:
+    driver: local
+  rustbot-tmp:
+    driver: local
 
 networks:
   rustbot-network:
