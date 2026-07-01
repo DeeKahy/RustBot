@@ -90,7 +90,7 @@ pub async fn stats(
         all_messages.extend(messages);
 
         // Update progress every 500 messages
-        if collected % 500 == 0 || collected >= message_count {
+        if collected.is_multiple_of(500) || collected >= message_count {
             reply
                 .edit(
                     ctx,
