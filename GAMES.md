@@ -1,47 +1,46 @@
-# 🎮 Discord Bot Games
+# Discord Bot Games
 
-This Discord bot includes three fun interactive games you can play directly in Discord!
+RustBot includes three interactive games you can play directly in Discord. Every command works with
+both the `-` prefix and the `/` slash form.
 
-## 🎯 Number Guessing Game
+## Number Guessing
 
-Guess a randomly generated number with helpful hints!
+Guess a randomly generated number with hints.
 
-### Commands:
-- `/numberguess [min] [max]` - Start a new game (default range: 1-100)
-- `/guess <number>` - Make a guess
-- `/hint` - Get helpful hints about your game
-- `/gamestatus` - Check your current game progress
-- `/endgame` - End your current game
+### Commands
+- `-numberguess [min] [max]` - Start a new game (default range 1-100)
+- `-guess <number>` - Make a guess
+- `-hint` - Get a hint about your game
+- `-gamestatus` - Check your current progress
+- `-endgame` - End your current game
 
-### How to Play:
-1. Use `/numberguess` to start (optionally specify custom range)
-2. The bot will think of a number in the specified range
-3. Use `/guess <number>` to make guesses
-4. Get "too high" or "too low" hints with proximity feedback
-5. Try to guess in as few attempts as possible!
+### How to play
+1. Start with `-numberguess` (optionally pass a custom range).
+2. The bot picks a number in the range.
+3. Guess with `-guess <number>` and use the "too high" / "too low" and proximity feedback.
+4. Try to find it in as few attempts as possible.
 
-### Features:
-- 🔥 Proximity hints (hot/cold feedback)
-- 📊 Performance rating system
-- 🎯 Custom number ranges
-- 📈 Attempt tracking
+### Features
+- Proximity (hot/cold) hints
+- Performance rating and attempt tracking
+- Custom number ranges
 
 ---
 
-## ⭕ Tic-Tac-Toe
+## Tic-Tac-Toe
 
-Classic 3x3 grid game with two-player mode or AI opponent!
+Classic 3x3 game, two players or against the AI.
 
-### Commands:
-- `/tictactoe [@opponent]` - Start a game (vs player or AI if no opponent)
-- `/move <position>` - Make your move (position 1-9)
-- `/board` - View current game board
-- `/endttt` - End your current game
+### Commands
+- `-tictactoe [@opponent]` - Start a game (vs the AI if no opponent is given)
+- `-move_ttt <position>` - Make a move (position 1-9)
+- `-board` - View the current board
+- `-endttt` - End your current game
 
-### How to Play:
-1. Use `/tictactoe` to play vs AI, or `/tictactoe @friend` for two-player
-2. X always goes first
-3. Use `/move <number>` where number is 1-9:
+### How to play
+1. `-tictactoe` plays against the AI; `-tictactoe @friend` starts a two-player game.
+2. X always goes first.
+3. Move with `-move_ttt <n>`, where positions are numbered:
    ```
    1 | 2 | 3
    --|---|--
@@ -49,76 +48,56 @@ Classic 3x3 grid game with two-player mode or AI opponent!
    --|---|--
    7 | 8 | 9
    ```
-4. Get three in a row to win!
+4. Get three in a row to win.
 
-### Features:
-- 🤖 Smart AI opponent with strategic play
-- 👥 Two-player multiplayer support
-- 🎨 Clean ASCII board display
-- 🏆 Win detection for all patterns
-
----
-
-## 🎪 Hangman
-
-Classic word guessing game with programming-themed words!
-
-### Commands:
-- `/hangman [custom_word]` - Start a new game
-- `/letter <letter>` - Guess a letter
-- `/hangmanstatus` - Check your game progress
-- `/hangmanhint` - Get hints about the word
-- `/endhangman` - End your current game
-
-### How to Play:
-1. Use `/hangman` to start with a random word
-2. Use `/letter <letter>` to guess letters one at a time
-3. Wrong guesses add body parts to the hangman drawing
-4. Guess the complete word before the drawing is finished!
-
-### Features:
-- 🎨 ASCII hangman drawing that progresses with wrong guesses
-- 📚 Programming and tech-themed word categories
-- 💡 Hint system showing category and progress
-- 🎯 Custom word support for practice
-
-### Word Categories:
-- Programming Languages (Python, Rust, JavaScript)
-- Programming Concepts (Function, Loop, Array)
-- Data Structures (Vector, HashMap)
-- Discord/Tech Terms (Server, Channel, Command)
-- General Knowledge words
+### Features
+- Strategic AI opponent
+- Two-player support
+- ASCII board display and full win detection
 
 ---
 
-## 🎮 General Game Features
+## Hangman
 
-### Session Management:
-- Each player can have one active game per game type
-- Games are automatically saved during play
-- Use the respective "end" commands to quit early
+Word guessing game with programming-themed words.
 
-### User Experience:
-- 🎨 Rich formatting with emojis and Discord markdown
-- 📊 Progress tracking and statistics
-- 🎯 Helpful error messages and guidance
-- 🏆 Performance ratings and achievements
+### Commands
+- `-hangman [custom_word]` - Start a new game
+- `-letter <letter>` - Guess a letter
+- `-hangmanstatus` - Check your progress
+- `-hangmanhint` - Get a hint about the word
+- `-endhangman` - End your current game
 
-### Fair Play:
-- Games are isolated per user (no interference)
-- AI difficulty is balanced for fun gameplay
-- Random elements ensure replayability
+### How to play
+1. `-hangman` starts with a random word.
+2. Guess letters one at a time with `-letter <letter>`.
+3. Wrong guesses add to the hangman drawing.
+4. Complete the word before the drawing is finished.
+
+### Features
+- ASCII drawing that progresses with wrong guesses
+- Hint system showing category and progress
+- Custom word support for practice
+
+### Word categories
+- Programming languages (Python, Rust, JavaScript)
+- Programming concepts (Function, Loop, Array)
+- Data structures (Vector, HashMap)
+- Discord / tech terms (Server, Channel, Command)
+- General knowledge
 
 ---
 
-## 🚀 Quick Start
+## General
 
-Try these commands to get started:
+- Each player can have one active game per game type.
+- Games are saved during play; use the matching "end" command to quit early.
+- Games are isolated per user, and the AI is tuned for fun rather than to be unbeatable.
+
+## Quick start
 
 ```
-/numberguess           # Start number guessing (1-100)
-/tictactoe            # Play tic-tac-toe vs AI
-/hangman              # Start hangman with random word
+-numberguess     # start number guessing (1-100)
+-tictactoe       # play tic-tac-toe vs the AI
+-hangman         # start hangman with a random word
 ```
-
-Have fun gaming! 🎉

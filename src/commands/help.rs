@@ -31,40 +31,65 @@ pub async fn help(
 
 async fn show_general_help(ctx: Context<'_>) -> Result<(), Error> {
     let embed = serenity::CreateEmbed::new()
-        .title("🤖 Bot Help - Available Commands")
-        .description("Here are all the available commands you can use with this bot!\n\nUse `-help <command>` for detailed information about a specific command.")
-        .color(0x7289DA)
+        .title("RustBot — Commands")
+        .description("All commands work with both the `-` prefix and `/` slash forms.\nUse `-help <command>` for details on a specific command.")
+        .color(0x5865F2)
         .field(
-            "🏓 Basic Commands",
-            "• `-ping` - Check bot latency and responsiveness\n• `-hello` - Get a friendly greeting from the bot\n• `-help` - Show this help message\n• `-invite` - Get the bot invite link to add it to your server",
-            false
+            "Basic",
+            "• `-ping` - Check bot latency and responsiveness\n\
+             • `-hello [name]` - Get a friendly greeting\n\
+             • `-help [command]` - Show this menu, or details for one command\n\
+             • `-invite` - Get the bot's invite link\n\
+             • `-status` - Show bot diagnostics and health",
+            false,
         )
         .field(
-            "🎯 Fun Commands",
-            "• `-coinflip` - Flip a coin (heads or tails)\n• `-dice [sides]` - Roll a dice (defaults to 6 sides, try 1 for fun)\n• `-uwu <text>` - Convert text to uwu speak\n• `-yourmom` - Get a random \"your mom\" joke\n• `-spamping <count>` - Send multiple ping messages",
-            false
+            "Fun & Social",
+            "• `-coinflip` - Flip a coin\n\
+             • `-dice [sides]` - Roll a die (default 6 sides)\n\
+             • `-uwu <text>` - Convert text to uwu speak (or reply to a message)\n\
+             • `-mock <text>` - Alternating-case mocking text (or reply to a message)\n\
+             • `-yourmom` - Show a random server member\n\
+             • `-pfp [user]` - Get a user's profile picture\n\
+             • `-bonk [user]` - Bonk a user (avatar on a bonk GIF)\n\
+             • `-hit [user]` - Order a hit on a user (avatar on a hit GIF)",
+            false,
         )
         .field(
-            "👤 User Commands",
-            "• `-pfp [user]` - Get profile picture of yourself or another user",
-            false
+            "Chat Tools",
+            "• `-poll <question? opt1 opt2 ...>` - Create a reaction poll\n\
+             • `-react <text>` - Spell out text with emoji reactions (reply to a message)\n\
+             • `-spamping <user> [count]` - Ping a user in a thread until they respond\n\
+             • `-stats [count] [channel]` - Channel activity report with charts\n\
+             • `-remind set|list|remove|clear` - Manage personal reminders",
+            false,
         )
         .field(
-            "📊 Utility Commands",
-            "• `-stats [count] [channel]` - Analyze message statistics in a channel\n• `-poll <question? option1 option2...>` - Create a poll with reactions\n• `-react <text>` - Add emoji reactions (reply to message or use /react with message ID)\n• `-remind <time> <message>` - Set a reminder for the future",
-            false
+            "Voice / Music",
+            "• `-play <url|search> [channel link]` - Play YouTube audio in a voice channel\n\
+             • `-queue` - Show what's playing and queued\n\
+             • `-skip` - Skip the current track\n\
+             • `-stop` - Stop playback and clear the queue\n\
+             • `-leave` - Leave the voice channel (aliases: `-disconnect`, `-dc`)",
+            false,
         )
         .field(
-            "🛠️ Moderation Commands",
-            "• `-cleanup [count|after]` - Delete messages (admin only)\n• `-update` - Update bot from GitHub (owner only)\n• `-kys` - Reboot bot with 1-hour cooldown",
-            false
+            "Games",
+            "• `-numberguess [min] [max]` - Guess the number (also `-guess`, `-hint`, `-gamestatus`, `-endgame`)\n\
+             • `-tictactoe [@opponent]` - Tic-Tac-Toe vs a player or the AI (also `-move_ttt`, `-board`, `-endttt`)\n\
+             • `-hangman` - Word guessing game (also `-letter`, `-hangmanstatus`, `-hangmanhint`, `-endhangman`)\n\
+             See `GAMES.md` for full rules.",
+            false,
         )
         .field(
-            "💡 Tips",
-            "• Commands work with both prefix (`-`) and slash (`/`) formats\n• Most commands can be used in DMs or servers\n• Use `-help <command>` for detailed usage information",
-            false
+            "Utility & Owner",
+            "• `-park now|info|clear|schedule` - Mobile parking helper\n\
+             • `-cleanup [count|after]` - Delete messages (protected)\n\
+             • `-update` - Pull latest from GitHub and restart (protected)\n\
+             • `-kys` - Reboot the bot with a 1-hour cooldown (protected)",
+            false,
         )
-        .footer(serenity::CreateEmbedFooter::new("Bot developed with Rust & Poise 🦀"))
+        .footer(serenity::CreateEmbedFooter::new("Built with Rust + Poise"))
         .timestamp(serenity::Timestamp::now());
 
     ctx.send(poise::CreateReply::default().embed(embed).ephemeral(false))
@@ -85,9 +110,9 @@ async fn show_command_help(ctx: Context<'_>, command_name: &str) -> Result<(), E
         "hello" => CommandInfo {
             name: "hello",
             description: "Get a friendly greeting from the bot",
-            usage: "`-hello` or `/hello`",
-            examples: vec!["-hello"],
-            parameters: vec![],
+            usage: "`-hello [name]` or `/hello [name]`",
+            examples: vec!["-hello", "-hello World"],
+            parameters: vec!["name (optional) - Who to greet"],
         },
         "coinflip" => CommandInfo {
             name: "coinflip",
@@ -135,7 +160,7 @@ async fn show_command_help(ctx: Context<'_>, command_name: &str) -> Result<(), E
         },
         "stats" => CommandInfo {
             name: "stats",
-            description: "Analyze message statistics in a channel",
+            description: "Analyze channel activity and render a chart report (top users, hourly activity, message share)",
             usage: "`-stats [count] [channel]` or `/stats [count] [channel]`",
             examples: vec!["-stats", "-stats 2000", "-stats 500 #general"],
             parameters: vec![
@@ -218,6 +243,112 @@ async fn show_command_help(ctx: Context<'_>, command_name: &str) -> Result<(), E
             examples: vec!["-help", "-help ping", "-help stats"],
             parameters: vec!["command (optional) - Specific command to get detailed help for"],
         },
+        "status" => CommandInfo {
+            name: "status",
+            description: "Show diagnostic information and bot health",
+            usage: "`-status` or `/status`",
+            examples: vec!["-status"],
+            parameters: vec![],
+        },
+        "mock" => CommandInfo {
+            name: "mock",
+            description: "Transform text into mOcKiNg alternating case, or reply to a message to mock it",
+            usage: "`-mock <text>` or `/mock <text>`",
+            examples: vec!["-mock this is a great idea"],
+            parameters: vec!["text - The text to mock (optional when replying to a message)"],
+        },
+        "bonk" => CommandInfo {
+            name: "bonk",
+            description: "Bonk a user by placing their profile picture on a random bonk GIF",
+            usage: "`-bonk [user]` or `/bonk [user]`",
+            examples: vec!["-bonk", "-bonk @username"],
+            parameters: vec!["user (optional) - Who to bonk (defaults to you)"],
+        },
+        "hit" => CommandInfo {
+            name: "hit",
+            description: "Order a hit on a user by placing their profile picture on a random hit GIF",
+            usage: "`-hit [user]` or `/hit [user]`",
+            examples: vec!["-hit", "-hit @username"],
+            parameters: vec!["user (optional) - The target (defaults to you)"],
+        },
+        "park" => CommandInfo {
+            name: "park",
+            description: "Mobile parking helper: park now, view/clear saved info, or schedule weekday parking",
+            usage: "`-park now|info|clear|schedule` or the matching slash subcommands",
+            examples: vec!["-park now", "-park info", "-park schedule"],
+            parameters: vec!["subcommand - one of: now, info, clear, schedule"],
+        },
+        "play" => CommandInfo {
+            name: "play",
+            description: "Play a YouTube video's audio in a voice channel",
+            usage: "`-play <url|search> [channel link]` or `/play <url|search>`",
+            examples: vec![
+                "-play never gonna give you up",
+                "-play https://youtu.be/dQw4w9WgXcQ",
+            ],
+            parameters: vec![
+                "query - A YouTube URL or search terms",
+                "channel link (optional) - A Discord channel link to target a specific voice channel (useful from DMs)",
+            ],
+        },
+        "skip" => CommandInfo {
+            name: "skip",
+            description: "Skip the track that's currently playing",
+            usage: "`-skip` or `/skip`",
+            examples: vec!["-skip"],
+            parameters: vec![],
+        },
+        "stop" => CommandInfo {
+            name: "stop",
+            description: "Stop playback and clear the queue (stays in the channel)",
+            usage: "`-stop` or `/stop`",
+            examples: vec!["-stop"],
+            parameters: vec![],
+        },
+        "queue" => CommandInfo {
+            name: "queue",
+            description: "Show what's playing and what's queued up next",
+            usage: "`-queue` or `/queue`",
+            examples: vec!["-queue"],
+            parameters: vec![],
+        },
+        "leave" | "disconnect" | "dc" => CommandInfo {
+            name: "leave",
+            description: "Leave the voice channel (also clears the queue)",
+            usage: "`-leave` (aliases: `-disconnect`, `-dc`) or `/leave`",
+            examples: vec!["-leave"],
+            parameters: vec![],
+        },
+        "numberguess" => CommandInfo {
+            name: "numberguess",
+            description: "Start a number guessing game (default range 1-100)",
+            usage: "`-numberguess [min] [max]` or `/numberguess [min] [max]`",
+            examples: vec!["-numberguess", "-numberguess 1 500"],
+            parameters: vec![
+                "min (optional) - Lower bound (default 1)",
+                "max (optional) - Upper bound (default 100)",
+                "Play with `-guess <n>`, `-hint`, `-gamestatus`, `-endgame`",
+            ],
+        },
+        "tictactoe" => CommandInfo {
+            name: "tictactoe",
+            description: "Start a Tic-Tac-Toe game against another player or the AI",
+            usage: "`-tictactoe [@opponent]` or `/tictactoe [@opponent]`",
+            examples: vec!["-tictactoe", "-tictactoe @username"],
+            parameters: vec![
+                "opponent (optional) - Mention a player, or omit to play the AI",
+                "Play with `-move_ttt <1-9>`, `-board`, `-endttt`",
+            ],
+        },
+        "hangman" => CommandInfo {
+            name: "hangman",
+            description: "Start a Hangman word guessing game",
+            usage: "`-hangman` or `/hangman`",
+            examples: vec!["-hangman"],
+            parameters: vec![
+                "Play with `-letter <a-z>`, `-hangmanstatus`, `-hangmanhint`, `-endhangman`",
+            ],
+        },
         _ => {
             ctx.send(
                 poise::CreateReply::default()
@@ -249,14 +380,14 @@ struct CommandInfo {
 
 fn create_command_help_embed(info: &CommandInfo) -> serenity::CreateEmbed {
     let mut embed = serenity::CreateEmbed::new()
-        .title(format!("📖 Help: {}", info.name))
+        .title(format!("Help: {}", info.name))
         .description(info.description)
-        .color(0x7289DA)
-        .field("📝 Usage", info.usage, false);
+        .color(0x5865F2)
+        .field("Usage", info.usage, false);
 
     if !info.examples.is_empty() {
         let examples_text = info.examples.join("\n");
-        embed = embed.field("💡 Examples", format!("```\n{examples_text}\n```"), false);
+        embed = embed.field("Examples", format!("```\n{examples_text}\n```"), false);
     }
 
     if !info.parameters.is_empty() {
@@ -266,7 +397,7 @@ fn create_command_help_embed(info: &CommandInfo) -> serenity::CreateEmbed {
             .map(|p| format!("• {p}"))
             .collect::<Vec<_>>()
             .join("\n");
-        embed = embed.field("⚙️ Parameters", params_text, false);
+        embed = embed.field("Parameters", params_text, false);
     }
 
     embed

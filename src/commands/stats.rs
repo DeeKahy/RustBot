@@ -56,7 +56,7 @@ pub async fn stats(
     // Send initial message
     let reply = ctx
         .say(format!(
-            "📊 Analyzing last {message_count} messages in <#{target_channel}>..."
+            "Analyzing last {message_count} messages in <#{target_channel}>..."
         ))
         .await?;
 
@@ -80,7 +80,7 @@ pub async fn stats(
                     .edit(
                         ctx,
                         poise::CreateReply::default()
-                            .content(format!("❌ Error fetching messages: {e}")),
+                            .content(format!("Error fetching messages: {e}")),
                     )
                     .await?;
                 return Ok(());
@@ -101,7 +101,7 @@ pub async fn stats(
                 .edit(
                     ctx,
                     poise::CreateReply::default().content(format!(
-                        "📊 Analyzing messages... {collected}/{message_count}"
+                        "Analyzing messages... {collected}/{message_count}"
                     )),
                 )
                 .await?;
@@ -115,7 +115,7 @@ pub async fn stats(
         reply
             .edit(
                 ctx,
-                poise::CreateReply::default().content("❌ No messages found in this channel."),
+                poise::CreateReply::default().content("No messages found in this channel."),
             )
             .await?;
         return Ok(());
@@ -127,7 +127,7 @@ pub async fn stats(
     reply
         .edit(
             ctx,
-            poise::CreateReply::default().content("🎨 Rendering charts..."),
+            poise::CreateReply::default().content("Rendering charts..."),
         )
         .await?;
 
@@ -466,7 +466,7 @@ fn create_stats_embed(
     slices: &[PieSlice],
 ) -> serenity::CreateEmbed {
     let mut embed = serenity::CreateEmbed::new()
-        .title(format!("📊 #{channel_name} — activity report"))
+        .title(format!("#{channel_name} — activity report"))
         .description(format!(
             "Analysis of **{}** messages\n• {} words · {} characters\n• {:.1} words/msg · {:.1} chars/msg avg",
             commafy(analyzed_count as u32),
@@ -497,17 +497,17 @@ fn create_stats_embed(
         .collect::<Vec<_>>()
         .join("\n");
     if !legend.is_empty() {
-        embed = embed.field("🥧 Message share", legend, true);
+        embed = embed.field("Message share", legend, true);
     }
 
     // Word / character leaders.
     embed = embed.field(
-        "💬 Most words",
+        "Most words",
         top_list(stats, |u| u.words, "words", 5),
         true,
     );
     embed = embed.field(
-        "✍️ Most characters",
+        "Most characters",
         top_list(stats, |u| u.chars, "chars", 5),
         true,
     );
@@ -528,7 +528,7 @@ fn create_stats_embed(
         .collect::<Vec<_>>()
         .join("\n");
     if !yap_text.is_empty() {
-        embed = embed.field("🗣️ Yappiest (5+ msgs)", yap_text, true);
+        embed = embed.field("Yappiest (5+ msgs)", yap_text, true);
     }
 
     // Top words.
@@ -539,42 +539,42 @@ fn create_stats_embed(
             .map(|(w, c)| format!("`{w}` ×{c}"))
             .collect::<Vec<_>>()
             .join("  ");
-        embed = embed.field("🔥 Top words", words_text, false);
+        embed = embed.field("Top words", words_text, false);
     }
 
     // Awards.
     let mut awards: Vec<String> = Vec::new();
     if let Some(owl) = stats.users.values().filter(|u| u.night > 0).max_by_key(|u| u.night) {
-        awards.push(format!("🦉 **Night owl** (00–06h): {} ({} msgs)", owl.display, owl.night));
+        awards.push(format!("**Night owl** (00–06h): {} ({} msgs)", owl.display, owl.night));
     }
     if let Some(curious) = stats.users.values().filter(|u| u.questions > 0).max_by_key(|u| u.questions) {
-        awards.push(format!("❓ **Most inquisitive**: {} ({} questions)", curious.display, curious.questions));
+        awards.push(format!("**Most inquisitive**: {} ({} questions)", curious.display, curious.questions));
     }
     if let Some(linker) = stats.users.values().filter(|u| u.links > 0).max_by_key(|u| u.links) {
-        awards.push(format!("🔗 **Link lord**: {} ({} links)", linker.display, linker.links));
+        awards.push(format!("**Link lord**: {} ({} links)", linker.display, linker.links));
     }
     if !awards.is_empty() {
-        embed = embed.field("🏅 Awards", awards.join("\n"), false);
+        embed = embed.field("Awards", awards.join("\n"), false);
     }
 
     // Highlights.
     let (peak_h, peak_c) = stats.peak_hour();
     let mut highlights = vec![
-        format!("🕒 Peak hour: **{:02}:00** ({} msgs)", peak_h, peak_c),
+        format!("Peak hour: **{:02}:00** ({} msgs)", peak_h, peak_c),
         format!(
-            "❓ Questions: **{}** · 🔗 Links: **{}** · 📎 Attachments: **{}**",
+            "Questions: **{}** · Links: **{}** · Attachments: **{}**",
             commafy(stats.total_questions),
             commafy(stats.total_links),
             commafy(stats.total_attachments)
         ),
     ];
     if let Some((day, cnt)) = stats.busiest_day() {
-        highlights.push(format!("📅 Busiest day: **{}** ({} msgs)", day.format("%b %d"), cnt));
+        highlights.push(format!("Busiest day: **{}** ({} msgs)", day.format("%b %d"), cnt));
     }
     if let Some((chars, author, preview)) = &stats.longest {
-        highlights.push(format!("📝 Longest msg: **{}** ({} chars) — “{}…”", author, chars, preview.trim()));
+        highlights.push(format!("Longest msg: **{}** ({} chars) — “{}…”", author, chars, preview.trim()));
     }
-    embed = embed.field("📈 Highlights", highlights.join("\n"), false);
+    embed = embed.field("Highlights", highlights.join("\n"), false);
 
     embed.footer(serenity::CreateEmbedFooter::new(
         "Bot messages excluded • Times in Europe/Copenhagen • Rate limited for API safety",
