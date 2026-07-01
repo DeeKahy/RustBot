@@ -25,7 +25,9 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 lazy_static = "1.4"
 image = "0.24"
-reqwest = { version = "0.11", features = [
+# reqwest 0.12 across the whole crate (also the version songbird 0.6 uses, so
+# there's a single reqwest in the tree). rustls only, no OpenSSL.
+reqwest = { version = "0.12", features = [
     "stream",
     "rustls-tls",
     "json",
@@ -39,6 +41,33 @@ uuid = { version = "1.0", features = ["v4"] }
 parking_lot = "0.12"
 governor = "0.6"
 nonzero_ext = "0.3"
+# For implementing songbird's #[async_trait] EventHandler (voice idle timeout).
+async-trait = "0.1"
+# Voice support for the -play command. rustls everywhere (no OpenSSL), plus the
+# built-in track queue. Needs libopus at build time and yt-dlp + ffmpeg at runtime.
+# 0.6 is required for the DAVE protocol (Discord's E2EE voice), which newer voice
+# channels mandate — older songbird gets kicked with close code 4017. DAVE ships
+# in the default `driver` feature (pure-Rust `davey`, no extra native deps).
+songbird = { version = "0.6", default-features = false, features = [
+    "driver",
+    "gateway",
+    "serenity",
+    "rustls",
+    "tungstenite",
+    "builtin-queue",
+] }
+# Songbird ships its own Opus decoder but relies on symphonia for demuxing and for
+# other codecs. Enable the container/codec readers YouTube audio actually uses
+# (WebM/Opus, m4a/AAC, Ogg, MP3, raw PCM/WAV).
+symphonia = { version = "0.5", default-features = false, features = [
+    "aac",
+    "isomp4",
+    "mkv",
+    "ogg",
+    "mp3",
+    "pcm",
+    "wav",
+] }
 
 [[bin]]
 name = "rustbot"

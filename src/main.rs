@@ -4,6 +4,7 @@ use std::fs;
 use poise::serenity_prelude as serenity;
 use serde::{Deserialize, Serialize};
 use serenity::{ChannelId, Client, GatewayIntents};
+use songbird::serenity::SerenityInit;
 
 mod commands;
 mod utils;
@@ -12,9 +13,10 @@ use utils::send_dm_to_deekahy;
 
 use commands::{
     board, bonk, cleanup, coinflip, dice, endgame, endhangman, endttt, gamestatus, guess, hangman,
-    hangmanhint, hangmanstatus, hello, help, hint, hit, invite, kys, letter, mock, move_ttt,
-    numberguess, park, pfp, ping, poll, react, remind, spamping, start_parking_scheduler,
-    start_reminder_checker, stats, status, tictactoe, update, uwu, yourmom,
+    hangmanhint, hangmanstatus, hello, help, hint, hit, invite, kys, leave, letter, mock, move_ttt,
+    numberguess, park, pfp, ping, play, poll, queue, react, remind, skip, spamping,
+    start_parking_scheduler, start_reminder_checker, stats, status, stop, tictactoe, update, uwu,
+    yourmom,
 };
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -67,7 +69,13 @@ async fn main() {
     let intents = GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::DIRECT_MESSAGES
         | GatewayIntents::MESSAGE_CONTENT
-        | GatewayIntents::GUILD_MEMBERS;
+        | GatewayIntents::GUILD_MEMBERS
+        // GUILDS delivers GUILD_CREATE, which carries the initial voice-state list
+        // (who is already sitting in which channel). Without it the cache's
+        // voice_states stay empty and -play can never find the caller's channel.
+        | GatewayIntents::GUILDS
+        // GUILD_VOICE_STATES keeps that list live via VOICE_STATE_UPDATE.
+        | GatewayIntents::GUILD_VOICE_STATES;
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
@@ -94,6 +102,12 @@ async fn main() {
                 hit(),
                 bonk(),
                 park(),
+                // Voice / music commands
+                play(),
+                skip(),
+                stop(),
+                queue(),
+                leave(),
                 // Game commands
                 numberguess(),
                 guess(),
@@ -271,6 +285,7 @@ async fn main() {
 
     let mut client = Client::builder(&token, intents)
         .framework(framework)
+        .register_songbird()
         .await
         .expect("Error creating client");
 
