@@ -70,7 +70,11 @@ async fn main() {
         | GatewayIntents::DIRECT_MESSAGES
         | GatewayIntents::MESSAGE_CONTENT
         | GatewayIntents::GUILD_MEMBERS
-        // Needed so the cache knows which voice channel a user is in (for -play).
+        // GUILDS delivers GUILD_CREATE, which carries the initial voice-state list
+        // (who is already sitting in which channel). Without it the cache's
+        // voice_states stay empty and -play can never find the caller's channel.
+        | GatewayIntents::GUILDS
+        // GUILD_VOICE_STATES keeps that list live via VOICE_STATE_UPDATE.
         | GatewayIntents::GUILD_VOICE_STATES;
 
     let framework = poise::Framework::builder()
