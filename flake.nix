@@ -2,38 +2,60 @@
   description = "RustBot — a Serenity/Poise Discord bot";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
+  # crane gives us incremental Nix builds: dependency crates are compiled once
+  # into a cached artifact, so editing the bot's own code recompiles only the
+  # rustbot crate instead of all ~450 deps every time. Pinned to v0.20.3, the
+  # last line that supports nixpkgs 24.11/25.05 (master now requires 25.11).
+  inputs.crane.url = "github:ipetkov/crane/v0.20.3";
 
-  outputs = { self, nixpkgs }:
+  outputs = { self, nixpkgs, crane }:
     let
       systems = [ "x86_64-linux" "aarch64-linux" ];
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
     in
     {
-      packages = forAllSystems (pkgs: rec {
-        rustbot = pkgs.rustPlatform.buildRustPackage {
-          pname = "rustbot";
-          version = "0.1.0";
-          src = self;
-          cargoLock.lockFile = ./Cargo.lock;
+      packages = forAllSystems (pkgs:
+        let
+          craneLib = crane.mkLib pkgs;
+
           # All TLS is rustls (serenity rustls_backend, reqwest rustls-tls). The one
           # native dependency is libopus, needed by songbird's voice encoder; its
           # `audiopus_sys` build script finds it via pkg-config.
-          nativeBuildInputs = [ pkgs.pkg-config pkgs.makeWrapper ];
-          buildInputs = [ pkgs.libopus ];
-          # The bot loads GIFs from ./assets/{bonk,hit} relative to its CWD, so we
-          # ship the assets alongside the binary and run from $out/share/rustbot.
-          # The -play command shells out to yt-dlp and ffmpeg at runtime, so put
-          # both on the binary's PATH regardless of how the service invokes it.
-          postInstall = ''
-            mkdir -p $out/share/rustbot
-            cp -r assets $out/share/rustbot/assets
-            wrapProgram $out/bin/rustbot \
-              --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.yt-dlp pkgs.ffmpeg ]}
-          '';
-          meta.mainProgram = "rustbot";
-        };
-        default = rustbot;
-      });
+          commonArgs = {
+            pname = "rustbot";
+            version = "0.1.0";
+            src = craneLib.cleanCargoSource self;
+            strictDeps = true;
+            nativeBuildInputs = [ pkgs.pkg-config pkgs.makeWrapper ];
+            buildInputs = [ pkgs.libopus ];
+          };
+
+          # Compile just the dependencies. This derivation is keyed on Cargo.toml /
+          # Cargo.lock, so it stays cached across rebuilds until the deps change.
+          cargoArtifacts = craneLib.buildDepsOnly commonArgs;
+
+          rustbot = craneLib.buildPackage (commonArgs // {
+            inherit cargoArtifacts;
+            # The final build also needs the runtime GIF assets, which the
+            # cargo-only source filter above strips out — use a fuller source here.
+            src = pkgs.lib.cleanSource self;
+            # The bot loads GIFs from ./assets/{bonk,hit} relative to its CWD, so we
+            # ship the assets alongside the binary and run from $out/share/rustbot.
+            # The -play command shells out to yt-dlp and ffmpeg at runtime, so put
+            # both on the binary's PATH regardless of how the service invokes it.
+            postInstall = ''
+              mkdir -p $out/share/rustbot
+              cp -r assets $out/share/rustbot/assets
+              wrapProgram $out/bin/rustbot \
+                --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.yt-dlp pkgs.ffmpeg ]}
+            '';
+            meta.mainProgram = "rustbot";
+          });
+        in
+        {
+          inherit rustbot;
+          default = rustbot;
+        });
 
       # Multi-instance NixOS module. Each instance is a separate systemd service
       # with its own environment file and data dir. The bot hard-codes
