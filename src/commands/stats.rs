@@ -1,7 +1,24 @@
 use crate::{Context, Error};
 use poise::serenity_prelude as serenity;
 use std::collections::HashMap;
+use std::io::Cursor;
 use tokio::time::{sleep, Duration};
+
+/// Palette for the pie chart slices. Each colour is paired (by index) with the
+/// Discord coloured-square emoji used for that slice in the legend, so the image
+/// and the text stay in sync without baking any text into the PNG.
+const SLICE_COLORS: [[u8; 3]; 9] = [
+    [237, 66, 69],   // red
+    [230, 126, 34],  // orange
+    [254, 231, 92],  // yellow
+    [87, 242, 135],  // green
+    [52, 152, 219],  // blue
+    [155, 89, 182],  // purple
+    [121, 85, 72],   // brown
+    [79, 84, 92],    // dark grey
+    [185, 187, 190], // light grey ("Others")
+];
+const SLICE_EMOJI: [&str; 9] = ["🟥", "🟧", "🟨", "🟩", "🟦", "🟪", "🟫", "⬛", "⬜"];
 
 /// Shows detailed statistics about message activity in a channel
 ///
@@ -118,14 +135,172 @@ pub async fn stats(
     // Analyze the messages
     let stats = analyze_messages(&all_messages);
 
-    // Create embed with statistics
-    let embed = create_stats_embed(&stats, &channel_name, all_messages.len());
+    // Build the pie-chart slices (top users by message count, rest folded into
+    // "Others") and render them to a PNG we can attach to the embed.
+    let slices = build_message_slices(&stats.user_message_counts);
+    let chart_png = render_pie_chart(&slices);
 
-    reply
-        .edit(ctx, poise::CreateReply::default().content("").embed(embed))
-        .await?;
+    // Create embed with statistics
+    let mut embed = create_stats_embed(&stats, &channel_name, all_messages.len());
+
+    let mut builder = poise::CreateReply::default().content("");
+
+    if let Some(png) = chart_png {
+        embed = embed
+            .field("🥧 Message Share", legend_text(&slices), false)
+            .image("attachment://stats_pie.png");
+        builder = builder
+            .attachment(serenity::CreateAttachment::bytes(png, "stats_pie.png"));
+    }
+
+    reply.edit(ctx, builder.embed(embed)).await?;
 
     Ok(())
+}
+
+/// A single pie slice: display label, message count, and the palette index that
+/// ties it to a colour + legend emoji.
+struct Slice {
+    label: String,
+    count: u32,
+    color_idx: usize,
+}
+
+/// Turn per-user message counts into at most 8 named slices plus an aggregated
+/// "Others" slice, sorted from most to least active.
+fn build_message_slices(user_message_counts: &HashMap<String, u32>) -> Vec<Slice> {
+    const MAX_NAMED: usize = 8;
+
+    let mut counts: Vec<(&String, &u32)> = user_message_counts.iter().collect();
+    counts.sort_by(|a, b| b.1.cmp(a.1).then_with(|| a.0.cmp(b.0)));
+
+    let mut slices: Vec<Slice> = counts
+        .iter()
+        .take(MAX_NAMED)
+        .enumerate()
+        .map(|(i, (user, count))| Slice {
+            label: user.split('#').next().unwrap_or(user).to_string(),
+            count: **count,
+            color_idx: i,
+        })
+        .collect();
+
+    let others: u32 = counts.iter().skip(MAX_NAMED).map(|(_, c)| **c).sum();
+    if others > 0 {
+        slices.push(Slice {
+            label: "Others".to_string(),
+            count: others,
+            color_idx: SLICE_COLORS.len() - 1,
+        });
+    }
+
+    slices
+}
+
+/// Colour-coded legend that maps each emoji to its user, count and share.
+fn legend_text(slices: &[Slice]) -> String {
+    let total: u32 = slices.iter().map(|s| s.count).sum();
+    slices
+        .iter()
+        .map(|s| {
+            let pct = if total > 0 {
+                s.count as f32 / total as f32 * 100.0
+            } else {
+                0.0
+            };
+            format!(
+                "{} **{}** — {} ({:.0}%)",
+                SLICE_EMOJI[s.color_idx], s.label, s.count, pct
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Render the slices to an anti-aliased PNG pie chart. Text is intentionally
+/// left off the image (the embed carries the legend) so no font handling or
+/// extra dependencies are needed. Returns `None` if there is nothing to draw.
+fn render_pie_chart(slices: &[Slice]) -> Option<Vec<u8>> {
+    let total: u32 = slices.iter().map(|s| s.count).sum();
+    if total == 0 || slices.is_empty() {
+        return None;
+    }
+
+    // Supersample, then downscale, for cheap anti-aliasing of the wedge edges.
+    const SIZE: u32 = 440;
+    const SS: u32 = 3;
+    let hi = SIZE * SS;
+    let center = hi as f32 / 2.0;
+    let radius = center - (12 * SS) as f32;
+    let gap = SS as f32; // white separator half-width between slices, in px
+
+    // Precompute each slice's cumulative angle range (radians), starting at the
+    // top (12 o'clock) and sweeping clockwise.
+    let mut bounds: Vec<(f32, f32, [u8; 3])> = Vec::with_capacity(slices.len());
+    let mut acc = 0.0f32;
+    let tau = std::f32::consts::TAU;
+    for s in slices {
+        let start = acc;
+        acc += s.count as f32 / total as f32 * tau;
+        bounds.push((start, acc, SLICE_COLORS[s.color_idx]));
+    }
+
+    let mut img = image::RgbaImage::new(hi, hi);
+    for (x, y, px) in img.enumerate_pixels_mut() {
+        let dx = x as f32 + 0.5 - center;
+        let dy = y as f32 + 0.5 - center;
+        let dist = (dx * dx + dy * dy).sqrt();
+        if dist > radius {
+            *px = image::Rgba([0, 0, 0, 0]); // transparent outside the circle
+            continue;
+        }
+
+        // Angle clockwise from the top, in [0, tau).
+        let mut ang = dx.atan2(-dy);
+        if ang < 0.0 {
+            ang += tau;
+        }
+
+        let color = bounds
+            .iter()
+            .find(|(start, end, _)| ang >= *start && ang < *end)
+            .map(|(_, _, c)| *c)
+            .unwrap_or(bounds.last().unwrap().2);
+
+        // Thin white separators between slices (skip when there is only one).
+        if bounds.len() > 1 {
+            let mut on_edge = false;
+            for (start, _, _) in &bounds {
+                let mut da = (ang - start).abs();
+                if da > tau / 2.0 {
+                    da = tau - da;
+                }
+                if da * dist < gap {
+                    on_edge = true;
+                    break;
+                }
+            }
+            if on_edge {
+                *px = image::Rgba([255, 255, 255, 255]);
+                continue;
+            }
+        }
+
+        *px = image::Rgba([color[0], color[1], color[2], 255]);
+    }
+
+    let scaled = image::imageops::resize(
+        &img,
+        SIZE,
+        SIZE,
+        image::imageops::FilterType::Triangle,
+    );
+
+    let mut bytes = Vec::new();
+    scaled
+        .write_to(&mut Cursor::new(&mut bytes), image::ImageOutputFormat::Png)
+        .ok()?;
+    Some(bytes)
 }
 
 struct MessageStats {
@@ -357,5 +532,74 @@ mod tests {
         // Test passes if the function compiles and can be called
         let function_name = "stats";
         assert_eq!(function_name.len(), 5);
+    }
+
+    #[test]
+    fn test_build_slices_aggregates_others() {
+        let mut counts = HashMap::new();
+        for i in 0..12 {
+            counts.insert(format!("user{i}"), (12 - i) as u32);
+        }
+        let slices = build_message_slices(&counts);
+        // 8 named users + 1 "Others" slice for the remaining 4.
+        assert_eq!(slices.len(), 9);
+        assert_eq!(slices.last().unwrap().label, "Others");
+        // Others = users 8..12 with counts 4+3+2+1 = 10.
+        assert_eq!(slices.last().unwrap().count, 10);
+        // Slices are sorted most-active first.
+        assert_eq!(slices[0].count, 12);
+    }
+
+    #[test]
+    fn test_build_slices_no_others_when_few_users() {
+        let mut counts = HashMap::new();
+        counts.insert("alice".to_string(), 3);
+        counts.insert("bob".to_string(), 1);
+        let slices = build_message_slices(&counts);
+        assert_eq!(slices.len(), 2);
+        assert!(slices.iter().all(|s| s.label != "Others"));
+    }
+
+    #[test]
+    fn test_render_pie_chart_empty() {
+        assert!(render_pie_chart(&[]).is_none());
+        let zero = vec![Slice {
+            label: "x".to_string(),
+            count: 0,
+            color_idx: 0,
+        }];
+        assert!(render_pie_chart(&zero).is_none());
+    }
+
+    #[test]
+    fn test_render_pie_chart_produces_png() {
+        let slices = build_message_slices(&HashMap::from([
+            ("alice".to_string(), 5),
+            ("bob".to_string(), 3),
+            ("carol".to_string(), 2),
+        ]));
+        let png = render_pie_chart(&slices).expect("should render");
+        // PNG magic number.
+        assert_eq!(&png[..8], &[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A]);
+    }
+
+    #[test]
+    fn test_legend_text_percentages() {
+        let slices = vec![
+            Slice {
+                label: "alice".to_string(),
+                count: 3,
+                color_idx: 0,
+            },
+            Slice {
+                label: "bob".to_string(),
+                count: 1,
+                color_idx: 1,
+            },
+        ];
+        let legend = legend_text(&slices);
+        assert!(legend.contains("alice"));
+        assert!(legend.contains("75%"));
+        assert!(legend.contains("🟥"));
     }
 }
