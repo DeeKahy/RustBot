@@ -122,48 +122,53 @@ pub async fn react(
 fn create_emoji_mapping() -> HashMap<char, Vec<&'static str>> {
     let mut map = HashMap::new();
 
-    // Letters with regional indicators as primary option, then fallbacks
-    map.insert('a', vec!["🇦", "🅰️", "🔺", "🅰", "4️⃣"]);
-    map.insert('b', vec!["🇧", "🅱️", "🅱", "6️⃣", "🪨"]);
-    map.insert('c', vec!["🇨", "©️", "🌙", "☪️", "🥐"]);
-    map.insert('d', vec!["🇩", "↩️", "🌛", "🌜", "🎯"]);
-    map.insert('e', vec!["🇪", "3️⃣", "💶", "📧", "🔱"]);
-    map.insert('f', vec!["🇫", "🎏", "🪦", "📠", "🔥"]);
-    map.insert('g', vec!["🇬", "🔄", "🌀", "🎯", "⚙️"]);
-    map.insert('h', vec!["🇭", "🏨", "🏥", "🏡", "♓"]);
-    map.insert('i', vec!["🇮", "ℹ️", "1️⃣", "🍦", "🧊"]);
-    map.insert('j', vec!["🇯", "🎷", "🗾", "🪝", "🕺"]);
-    map.insert('k', vec!["🇰", "🎋", "🦘", "🥝", "🔑"]);
-    map.insert('l', vec!["🇱", "🇮", "1️⃣", "🏩", "📱"]); // L is tricky, use I as fallback
-    map.insert('m', vec!["🇲", "Ⓜ️", "〽️", "🎵", "🗻"]);
-    map.insert('n', vec!["🇳", "📈", "🎵", "🌃", "♑"]);
+    // Letters: regional indicator first (the clearest), then a deep list of
+    // fallbacks so a letter can repeat several times in one message (Discord
+    // rejects a duplicate reaction, and each regional indicator exists only
+    // once). Fallbacks lean on letter-name or shape mnemonics.
+    map.insert('a', vec!["🇦", "🅰️", "🅰", "4️⃣", "🔺", "🔻", "⛺", "🐜", "🍎", "✈️", "🚑", "🎗️"]);
+    map.insert('b', vec!["🇧", "🅱️", "🅱", "6️⃣", "🐝", "🎈", "🍌", "⚾", "📚", "🔔", "🏀", "🦇"]);
+    map.insert('c', vec!["🇨", "©️", "🌙", "☪️", "🥐", "🐱", "☁️", "🎂", "🚗", "📅", "🍪", "🎪"]);
+    map.insert('d', vec!["🇩", "↩️", "🌛", "🌜", "🐶", "🚪", "💧", "🦆", "🥁", "💎", "🦕", "🍩"]);
+    map.insert('e', vec!["🇪", "3️⃣", "💶", "📧", "🔱", "🥚", "🦅", "👁️", "🌍", "🐘", "📩", "✉️"]);
+    map.insert('f', vec!["🇫", "🎏", "🪦", "📠", "🔥", "🐸", "🍟", "🌸", "🏈", "🎆", "🍀", "🦊"]);
+    map.insert('g', vec!["🇬", "🔄", "🌀", "⚙️", "🍇", "👻", "🎸", "🦍", "🎁", "🌐", "🍏", "🦒"]);
+    map.insert('h', vec!["🇭", "🏨", "🏥", "🏡", "♓", "🐴", "❤️", "🔨", "🍯", "🏠", "👋", "🎃"]);
+    map.insert('i', vec!["🇮", "ℹ️", "1️⃣", "🍦", "🧊", "🏝️", "🎐", "🍨", "🏒", "🕯️", "📍", "🪆"]);
+    map.insert('j', vec!["🇯", "🎷", "🗾", "🪝", "🕺", "🤹", "🕹️", "🃏", "🫙", "🧃", "👖", "🪼"]);
+    map.insert('k', vec!["🇰", "🎋", "🦘", "🥝", "🔑", "🪁", "👑", "🔪", "🗝️", "🐨", "🍶", "🎏"]);
+    map.insert('l', vec!["🇱", "🏩", "📱", "🦁", "🍋", "💡", "🪜", "🍃", "🦙", "🔒", "📏", "🇮"]); // 🇮 kept as a last-ditch L
+    map.insert('m', vec!["🇲", "Ⓜ️", "〽️", "🎵", "🗻", "🐒", "🍄", "🥛", "🌝", "🐭", "📢", "🧲"]);
+    map.insert('n', vec!["🇳", "📈", "🌃", "♑", "👃", "📰", "🎶", "🥜", "🪺", "🔢", "🌰", "🎾"]);
     map.insert(
         'o',
-        vec!["🇴", "⭕", "🅾️", "🅾", "0️⃣", "🔴", "🟡", "🟢", "🔵", "🟣"],
+        vec![
+            "🇴", "⭕", "🅾️", "🅾", "0️⃣", "🔴", "🟡", "🟢", "🔵", "🟣", "🟠", "🟤", "⚫", "⚪", "🍩", "🍊",
+        ],
     );
-    map.insert('p', vec!["🇵", "🅿️", "🅿", "🪩", "📌"]);
-    map.insert('q', vec!["🇶", "🎯", "🔍", "❓", "🪙"]);
-    map.insert('r', vec!["🇷", "®️", "🚀", "🌈", "♻️"]);
-    map.insert('s', vec!["🇸", "💲", "5️⃣", "🐍", "⚡"]);
-    map.insert('t', vec!["🇹", "✝️", "🌴", "🍵", "📐"]);
-    map.insert('u', vec!["🇺", "⛎", "🔄", "🌙", "⚓"]);
-    map.insert('v', vec!["🇻", "✅", "♈", "🎭", "🔽"]);
-    map.insert('w', vec!["🇼", "〰️", "🤷", "🌊", "💧"]);
-    map.insert('x', vec!["🇽", "❌", "✖️", "❎", "🔀"]);
-    map.insert('y', vec!["🇾", "💴", "🧘", "☯️", "🌟"]);
-    map.insert('z', vec!["🇿", "💤", "⚡", "🦓", "0️⃣"]);
+    map.insert('p', vec!["🇵", "🅿️", "🅿", "📌", "🐧", "🍕", "🥞", "🎉", "🍍", "🐼", "📎", "🪩"]);
+    map.insert('q', vec!["🇶", "❓", "🔍", "🪙", "👸", "🎯", "⏺️", "🫖", "🥌", "🧉", "🀄", "❔"]);
+    map.insert('r', vec!["🇷", "®️", "🚀", "🌈", "♻️", "🤖", "🌹", "📻", "🐀", "💍", "🏉", "🎗️"]);
+    map.insert('s', vec!["🇸", "💲", "5️⃣", "🐍", "⚡", "⭐", "🍓", "☀️", "🧦", "🐌", "🌟", "🛑"]);
+    map.insert('t', vec!["🇹", "✝️", "🌴", "🍵", "📐", "🐯", "🌳", "🚂", "🎾", "🐢", "🌮", "⏰"]);
+    map.insert('u', vec!["🇺", "⛎", "⚓", "☂️", "🦄", "🌂", "🧲", "🔄", "🦉", "🛸", "🎣", "🥴"]);
+    map.insert('v', vec!["🇻", "✅", "♈", "🎭", "🔽", "✌️", "🎻", "🌋", "🏐", "📛", "🦠", "🚐"]);
+    map.insert('w', vec!["🇼", "〰️", "🤷", "🌊", "💧", "🐋", "🍉", "🐺", "⌚", "🍷", "🪱", "🌥️"]);
+    map.insert('x', vec!["🇽", "❌", "✖️", "❎", "🔀", "⚔️", "🩻", "🚫", "✂️", "⌛", "🎌", "💥"]);
+    map.insert('y', vec!["🇾", "💴", "🧘", "☯️", "🌟", "🪀", "🧶", "🟡", "🪁", "🛥️", "🤸", "🟨"]);
+    map.insert('z', vec!["🇿", "💤", "⚡", "🦓", "🧟", "0️⃣", "🤐", "🎿", "🌩️", "🫏", "💫", "🔋"]);
 
     // Numbers
-    map.insert('0', vec!["0️⃣", "⭕", "🅾️", "🔴"]);
-    map.insert('1', vec!["1️⃣", "🇮", "ℹ️", "🥇"]);
-    map.insert('2', vec!["2️⃣", "🦢", "🥈", "🪝"]);
-    map.insert('3', vec!["3️⃣", "🇪", "🥉", "🔱"]);
-    map.insert('4', vec!["4️⃣", "🇦", "🍀", "🔲"]);
-    map.insert('5', vec!["5️⃣", "🇸", "🖐️", "⭐"]);
-    map.insert('6', vec!["6️⃣", "🇧", "🎯", "🔯"]);
-    map.insert('7', vec!["7️⃣", "🎰", "🔧", "📐"]);
-    map.insert('8', vec!["8️⃣", "♾️", "🎱", "⚡"]);
-    map.insert('9', vec!["9️⃣", "🌀", "🎯", "🔄"]);
+    map.insert('0', vec!["0️⃣", "⭕", "🅾️", "🔴", "🟢", "🔵", "⚫", "⚪", "🍩"]);
+    map.insert('1', vec!["1️⃣", "🥇", "🇮", "ℹ️", "🕐", "🎯", "🏑", "🥢"]);
+    map.insert('2', vec!["2️⃣", "🥈", "🦢", "🪝", "🕑", "♊", "✌️", "🦆"]);
+    map.insert('3', vec!["3️⃣", "🥉", "🇪", "🔱", "🕒", "♨️", "🎢", "〰️"]);
+    map.insert('4', vec!["4️⃣", "🇦", "🍀", "🔲", "🕓", "🏴", "⛳", "🪑"]);
+    map.insert('5', vec!["5️⃣", "🇸", "🖐️", "⭐", "🕔", "🌟", "🏵️", "✋"]);
+    map.insert('6', vec!["6️⃣", "🎯", "🔯", "🕕", "🎲", "♓", "🧬", "🐚"]);
+    map.insert('7', vec!["7️⃣", "🎰", "🔧", "📐", "🕖", "🪃", "🏒", "🎋"]);
+    map.insert('8', vec!["8️⃣", "♾️", "🎱", "⚡", "🕗", "⏳", "🎼", "🪀"]);
+    map.insert('9', vec!["9️⃣", "🌀", "🔄", "🕘", "🎈", "🎐", "🐌", "🔟"]);
 
     // Special characters and punctuation
     map.insert(' ', vec!["⬜", "▫️", "⚪"]);
@@ -218,5 +223,39 @@ mod tests {
         // Test that 'o' has many options for handling duplicates
         let o_options = map.get(&'o').unwrap();
         assert!(o_options.len() >= 5); // Should have multiple circle-like emojis
+    }
+
+    #[test]
+    fn test_every_letter_and_digit_has_deep_pool() {
+        let map = create_emoji_mapping();
+        // Every a-z and 0-9 should map to a healthy set of fallbacks so
+        // repeated characters in one message can all get a distinct reaction.
+        for ch in ('a'..='z').chain('0'..='9') {
+            let options = map
+                .get(&ch)
+                .unwrap_or_else(|| panic!("missing mapping for '{ch}'"));
+            assert!(
+                options.len() >= 5,
+                "'{ch}' has only {} options",
+                options.len()
+            );
+        }
+    }
+
+    #[test]
+    fn test_no_empty_or_duplicate_options() {
+        let map = create_emoji_mapping();
+        for (ch, options) in &map {
+            let mut seen = std::collections::HashSet::new();
+            for e in options {
+                assert!(!e.trim().is_empty(), "empty emoji in '{ch}' list");
+                // Reject stray ASCII text accidentally left in an emoji string.
+                assert!(
+                    !e.chars().any(|c| c.is_ascii_alphabetic()),
+                    "'{ch}' has a non-emoji token: {e:?}"
+                );
+                assert!(seen.insert(*e), "'{ch}' lists {e:?} twice");
+            }
+        }
     }
 }
