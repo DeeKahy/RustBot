@@ -4,7 +4,7 @@
 //! most active users (with their Discord avatars), an hourly-activity histogram,
 //! and a message-share pie chart. All drawing is done on top of the `image`
 //! crate via `imageproc`; text uses a bundled font (see `assets/fonts`) through
-//! `ab_glyph`, so there is no runtime font lookup and nothing native to link.
+//! `rusttype`, so there is no runtime font lookup and nothing native to link.
 
 use image::{Rgba, RgbaImage};
 use imageproc::drawing;
@@ -81,7 +81,15 @@ pub struct Infographic<'a> {
 
 // --- small drawing helpers -------------------------------------------------
 
-fn draw_text(canvas: &mut RgbaImage, color: Rgba<u8>, x: i32, y: i32, size: f32, bold: bool, s: &str) {
+fn draw_text(
+    canvas: &mut RgbaImage,
+    color: Rgba<u8>,
+    x: i32,
+    y: i32,
+    size: f32,
+    bold: bool,
+    s: &str,
+) {
     let font: &Font = if bold { &FONT_BOLD } else { &FONT };
     drawing::draw_text_mut(canvas, color, x, y, Scale::uniform(size), font, s);
 }
@@ -229,16 +237,30 @@ pub fn render(info: &Infographic) -> Option<Vec<u8>> {
 
     let total_h = PAD
         + header_h
-        + sec_gap + sec_title_h + bars_h
-        + sec_gap + sec_title_h + hist_h
-        + sec_gap + sec_title_h + pie_block_h
+        + sec_gap
+        + sec_title_h
+        + bars_h
+        + sec_gap
+        + sec_title_h
+        + hist_h
+        + sec_gap
+        + sec_title_h
+        + pie_block_h
         + PAD;
 
     let mut c = RgbaImage::from_pixel(WIDTH, total_h as u32, BG);
 
     // --- header ---
     let mut y = PAD;
-    draw_text(&mut c, TEXT, PAD, y, 40.0, true, &format!("#{}", info.channel));
+    draw_text(
+        &mut c,
+        TEXT,
+        PAD,
+        y,
+        40.0,
+        true,
+        &format!("#{}", info.channel),
+    );
     draw_text(&mut c, MUTED, PAD, y + 48, 22.0, false, &info.subtitle);
     y += header_h;
 
@@ -364,8 +386,11 @@ pub fn render(info: &Infographic) -> Option<Vec<u8>> {
 
     // encode
     let mut bytes = Vec::new();
-    c.write_to(&mut std::io::Cursor::new(&mut bytes), image::ImageOutputFormat::Png)
-        .ok()?;
+    c.write_to(
+        &mut std::io::Cursor::new(&mut bytes),
+        image::ImageOutputFormat::Png,
+    )
+    .ok()?;
     Some(bytes)
 }
 
@@ -374,7 +399,11 @@ mod tests {
     use super::*;
 
     fn slice(label: &str, count: u32, idx: usize) -> Slice {
-        Slice { label: label.to_string(), count, color_idx: idx }
+        Slice {
+            label: label.to_string(),
+            count,
+            color_idx: idx,
+        }
     }
 
     #[test]
@@ -404,11 +433,30 @@ mod tests {
             channel: "general",
             subtitle: "100 messages · 500 words".to_string(),
             bars: vec![
-                BarEntry { label: "alice".into(), value: 50, avatar: None, color_idx: 0 },
-                BarEntry { label: "bob".into(), value: 30, avatar: None, color_idx: 1 },
-                BarEntry { label: "carol".into(), value: 20, avatar: None, color_idx: 2 },
+                BarEntry {
+                    label: "alice".into(),
+                    value: 50,
+                    avatar: None,
+                    color_idx: 0,
+                },
+                BarEntry {
+                    label: "bob".into(),
+                    value: 30,
+                    avatar: None,
+                    color_idx: 1,
+                },
+                BarEntry {
+                    label: "carol".into(),
+                    value: 20,
+                    avatar: None,
+                    color_idx: 2,
+                },
             ],
-            slices: vec![slice("alice", 50, 0), slice("bob", 30, 1), slice("carol", 20, 2)],
+            slices: vec![
+                slice("alice", 50, 0),
+                slice("bob", 30, 1),
+                slice("carol", 20, 2),
+            ],
             hourly: {
                 let mut h = [0u32; 24];
                 h[9] = 10;

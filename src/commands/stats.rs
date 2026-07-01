@@ -100,9 +100,8 @@ pub async fn stats(
             reply
                 .edit(
                     ctx,
-                    poise::CreateReply::default().content(format!(
-                        "Analyzing messages... {collected}/{message_count}"
-                    )),
+                    poise::CreateReply::default()
+                        .content(format!("Analyzing messages... {collected}/{message_count}")),
                 )
                 .await?;
         }
@@ -167,8 +166,7 @@ pub async fn stats(
     let mut embed = embed;
     if let Some(png) = chart_png {
         embed = embed.image("attachment://stats.png");
-        builder =
-            builder.attachment(serenity::CreateAttachment::bytes(png, "stats.png"));
+        builder = builder.attachment(serenity::CreateAttachment::bytes(png, "stats.png"));
     }
 
     reply.edit(ctx, builder.embed(embed)).await?;
@@ -228,10 +226,10 @@ impl PieSlice {
 
 const STOPWORDS: &[&str] = &[
     "that", "this", "have", "with", "just", "like", "what", "your", "they", "them", "then",
-    "there", "here", "from", "about", "would", "could", "should", "were", "been", "being",
-    "will", "yeah", "gonna", "wanna", "dont", "cant", "youre", "thats", "when", "which",
-    "some", "into", "than", "also", "very", "much", "even", "more", "want", "know", "think",
-    "really", "still", "because", "their", "these", "those", "http", "https", "www", "com",
+    "there", "here", "from", "about", "would", "could", "should", "were", "been", "being", "will",
+    "yeah", "gonna", "wanna", "dont", "cant", "youre", "thats", "when", "which", "some", "into",
+    "than", "also", "very", "much", "even", "more", "want", "know", "think", "really", "still",
+    "because", "their", "these", "those", "http", "https", "www", "com",
 ];
 
 fn analyze_messages(messages: &[serenity::Message]) -> MessageStats {
@@ -300,8 +298,17 @@ fn analyze_messages(messages: &[serenity::Message]) -> MessageStats {
         total_attachments += message.attachments.len() as u32;
 
         // Longest message (by character count).
-        if longest.as_ref().map(|(c, _, _)| char_count > *c).unwrap_or(true) && char_count > 0 {
-            let preview: String = content.chars().take(70).collect::<String>().replace('\n', " ");
+        if longest
+            .as_ref()
+            .map(|(c, _, _)| char_count > *c)
+            .unwrap_or(true)
+            && char_count > 0
+        {
+            let preview: String = content
+                .chars()
+                .take(70)
+                .collect::<String>()
+                .replace('\n', " ");
             longest = Some((char_count, entry.display.clone(), preview));
         }
 
@@ -310,7 +317,11 @@ fn analyze_messages(messages: &[serenity::Message]) -> MessageStats {
             if raw.starts_with("http") {
                 continue;
             }
-            let w: String = raw.to_lowercase().chars().filter(|c| c.is_alphanumeric()).collect();
+            let w: String = raw
+                .to_lowercase()
+                .chars()
+                .filter(|c| c.is_alphanumeric())
+                .collect();
             if w.chars().count() >= 4 && !STOPWORDS.contains(&w.as_str()) {
                 *word_freq.entry(w).or_insert(0) += 1;
             }
@@ -348,7 +359,11 @@ impl MessageStats {
     /// Users sorted by message count, descending (ties broken by name).
     fn ranked(&self) -> Vec<&UserAgg> {
         let mut v: Vec<&UserAgg> = self.users.values().collect();
-        v.sort_by(|a, b| b.messages.cmp(&a.messages).then_with(|| a.display.cmp(&b.display)));
+        v.sort_by(|a, b| {
+            b.messages
+                .cmp(&a.messages)
+                .then_with(|| a.display.cmp(&b.display))
+        });
         v
     }
 
@@ -408,11 +423,18 @@ impl MessageStats {
     }
 
     fn busiest_day(&self) -> Option<(NaiveDate, u32)> {
-        self.per_day.iter().max_by_key(|(_, v)| **v).map(|(d, v)| (*d, *v))
+        self.per_day
+            .iter()
+            .max_by_key(|(_, v)| **v)
+            .map(|(d, v)| (*d, *v))
     }
 
     fn top_words(&self, n: usize) -> Vec<(String, u32)> {
-        let mut v: Vec<(String, u32)> = self.word_freq.iter().map(|(k, v)| (k.clone(), *v)).collect();
+        let mut v: Vec<(String, u32)> = self
+            .word_freq
+            .iter()
+            .map(|(k, v)| (k.clone(), *v))
+            .collect();
         v.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
         v.into_iter().take(n).collect()
     }
@@ -501,11 +523,7 @@ fn create_stats_embed(
     }
 
     // Word / character leaders.
-    embed = embed.field(
-        "Most words",
-        top_list(stats, |u| u.words, "words", 5),
-        true,
-    );
+    embed = embed.field("Most words", top_list(stats, |u| u.words, "words", 5), true);
     embed = embed.field(
         "Most characters",
         top_list(stats, |u| u.chars, "chars", 5),
@@ -544,14 +562,38 @@ fn create_stats_embed(
 
     // Awards.
     let mut awards: Vec<String> = Vec::new();
-    if let Some(owl) = stats.users.values().filter(|u| u.night > 0).max_by_key(|u| u.night) {
-        awards.push(format!("**Night owl** (00–06h): {} ({} msgs)", owl.display, owl.night));
+    if let Some(owl) = stats
+        .users
+        .values()
+        .filter(|u| u.night > 0)
+        .max_by_key(|u| u.night)
+    {
+        awards.push(format!(
+            "**Night owl** (00–06h): {} ({} msgs)",
+            owl.display, owl.night
+        ));
     }
-    if let Some(curious) = stats.users.values().filter(|u| u.questions > 0).max_by_key(|u| u.questions) {
-        awards.push(format!("**Most inquisitive**: {} ({} questions)", curious.display, curious.questions));
+    if let Some(curious) = stats
+        .users
+        .values()
+        .filter(|u| u.questions > 0)
+        .max_by_key(|u| u.questions)
+    {
+        awards.push(format!(
+            "**Most inquisitive**: {} ({} questions)",
+            curious.display, curious.questions
+        ));
     }
-    if let Some(linker) = stats.users.values().filter(|u| u.links > 0).max_by_key(|u| u.links) {
-        awards.push(format!("**Link lord**: {} ({} links)", linker.display, linker.links));
+    if let Some(linker) = stats
+        .users
+        .values()
+        .filter(|u| u.links > 0)
+        .max_by_key(|u| u.links)
+    {
+        awards.push(format!(
+            "**Link lord**: {} ({} links)",
+            linker.display, linker.links
+        ));
     }
     if !awards.is_empty() {
         embed = embed.field("Awards", awards.join("\n"), false);
@@ -569,10 +611,19 @@ fn create_stats_embed(
         ),
     ];
     if let Some((day, cnt)) = stats.busiest_day() {
-        highlights.push(format!("Busiest day: **{}** ({} msgs)", day.format("%b %d"), cnt));
+        highlights.push(format!(
+            "Busiest day: **{}** ({} msgs)",
+            day.format("%b %d"),
+            cnt
+        ));
     }
     if let Some((chars, author, preview)) = &stats.longest {
-        highlights.push(format!("Longest msg: **{}** ({} chars) — “{}…”", author, chars, preview.trim()));
+        highlights.push(format!(
+            "Longest msg: **{}** ({} chars) — “{}…”",
+            author,
+            chars,
+            preview.trim()
+        ));
     }
     embed = embed.field("Highlights", highlights.join("\n"), false);
 
@@ -582,9 +633,18 @@ fn create_stats_embed(
 }
 
 /// Build a numbered "top N" list from a per-user metric.
-fn top_list(stats: &MessageStats, metric: impl Fn(&UserAgg) -> u32, unit: &str, n: usize) -> String {
+fn top_list(
+    stats: &MessageStats,
+    metric: impl Fn(&UserAgg) -> u32,
+    unit: &str,
+    n: usize,
+) -> String {
     let mut v: Vec<&UserAgg> = stats.users.values().collect();
-    v.sort_by(|a, b| metric(b).cmp(&metric(a)).then_with(|| a.display.cmp(&b.display)));
+    v.sort_by(|a, b| {
+        metric(b)
+            .cmp(&metric(a))
+            .then_with(|| a.display.cmp(&b.display))
+    });
     let text = v
         .iter()
         .take(n)
@@ -656,7 +716,9 @@ mod tests {
 
     #[test]
     fn test_pie_slices_folds_others() {
-        let users: Vec<UserAgg> = (0..12).map(|i| agg(&format!("u{i}"), (20 - i) as u32)).collect();
+        let users: Vec<UserAgg> = (0..12)
+            .map(|i| agg(&format!("u{i}"), (20 - i) as u32))
+            .collect();
         let s = stats_with(users);
         let slices = s.pie_slices(8);
         assert_eq!(slices.len(), 9);
