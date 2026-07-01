@@ -29,37 +29,105 @@ fn author_voice_channel(ctx: &Context<'_>) -> Option<serenity::ChannelId> {
         .and_then(|vs| vs.channel_id)
 }
 
-/// Play a YouTube video's audio in your voice channel.
+/// Leading run of ASCII digits parsed as a u64 (tolerates trailing `?query`/`#frag`).
+fn leading_u64(s: &str) -> Option<u64> {
+    s.chars()
+        .take_while(char::is_ascii_digit)
+        .collect::<String>()
+        .parse()
+        .ok()
+}
+
+/// Parse a Discord channel URL such as
+/// `https://discord.com/channels/<guild>/<channel>` into its guild + channel IDs.
+/// Works for the discord.com / discordapp.com / ptb / canary variants.
+fn parse_channel_link(token: &str) -> Option<(serenity::GuildId, serenity::ChannelId)> {
+    let rest = token.split("/channels/").nth(1)?;
+    let mut segs = rest.split('/');
+    let guild = leading_u64(segs.next()?)?;
+    let channel = leading_u64(segs.next()?)?;
+    Some((
+        serenity::GuildId::new(guild),
+        serenity::ChannelId::new(channel),
+    ))
+}
+
+/// Split `-play` input into an optional explicit voice-channel target (from a
+/// pasted Discord channel link) and the remaining play query (URL or search terms).
+fn split_target(input: &str) -> (Option<(serenity::GuildId, serenity::ChannelId)>, String) {
+    let mut target = None;
+    let mut rest = Vec::new();
+    for tok in input.split_whitespace() {
+        if target.is_none() {
+            if let Some(t) = parse_channel_link(tok) {
+                target = Some(t);
+                continue;
+            }
+        }
+        rest.push(tok);
+    }
+    (target, rest.join(" "))
+}
+
+/// Play a YouTube video's audio in a voice channel.
 ///
-/// Usage: `-play <youtube url | search terms>`. If something is already playing,
-/// the new track is added to the queue.
-#[poise::command(prefix_command, slash_command, guild_only)]
+/// In a server: `-play <youtube url | search terms>` joins the channel you're in.
+/// From a DM (or to target a specific channel): also paste a channel link, e.g.
+/// `-play <url> https://discord.com/channels/<server>/<channel>`.
+/// If something is already playing, the new track is queued.
+#[poise::command(prefix_command, slash_command)]
 pub async fn play(
     ctx: Context<'_>,
-    #[description = "YouTube URL or search terms"]
+    #[description = "YouTube URL or search terms (optionally + a Discord channel link)"]
     #[rest]
-    query: String,
+    input: String,
 ) -> Result<(), Error> {
-    let query = query.trim().to_string();
+    let (target, query) = split_target(input.trim());
     if query.is_empty() {
-        ctx.say("❌ Give me a YouTube URL or something to search for: `-play <url or search>`")
-            .await?;
+        ctx.say(
+            "❌ Give me a YouTube URL or something to search for: `-play <url or search>`\n\
+             From a DM, also paste the voice-channel link: \
+             `-play <url> https://discord.com/channels/<server>/<channel>`",
+        )
+        .await?;
         return Ok(());
     }
 
-    let guild_id = match ctx.guild_id() {
-        Some(g) => g,
-        None => {
-            ctx.say("❌ This command only works inside a server.").await?;
-            return Ok(());
+    // Pick the target channel: an explicit channel link (works anywhere, incl.
+    // DMs), otherwise the channel the author is currently sitting in (server only).
+    let (guild_id, connect_to) = match target {
+        Some((g, c)) => {
+            // Guard against strangers puppeting the bot: the caller must be a
+            // member of the server the channel link points to.
+            if g.member(ctx.serenity_context(), ctx.author().id).await.is_err() {
+                ctx.say("❌ I couldn't verify you're a member of that server.")
+                    .await?;
+                return Ok(());
+            }
+            (g, c)
         }
-    };
-
-    let connect_to = match author_voice_channel(&ctx) {
-        Some(c) => c,
         None => {
-            ctx.say("❌ You need to be in a voice channel first.").await?;
-            return Ok(());
+            let g = match ctx.guild_id() {
+                Some(g) => g,
+                None => {
+                    ctx.say(
+                        "❌ In a DM I don't know which channel to join — paste a channel link:\n\
+                         `-play <url> https://discord.com/channels/<server>/<channel>`",
+                    )
+                    .await?;
+                    return Ok(());
+                }
+            };
+            match author_voice_channel(&ctx) {
+                Some(c) => (g, c),
+                None => {
+                    ctx.say(
+                        "❌ Join a voice channel first, or paste a channel link to pick one.",
+                    )
+                    .await?;
+                    return Ok(());
+                }
+            }
         }
     };
 
