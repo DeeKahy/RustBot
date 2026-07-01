@@ -21,6 +21,7 @@ pub mod react;
 pub mod remind;
 pub mod spamping;
 pub mod stats;
+pub mod stats_render;
 pub mod status;
 pub mod tictactoe;
 pub mod update;
