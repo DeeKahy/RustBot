@@ -27,7 +27,7 @@ pub async fn status(ctx: Context<'_>) -> Result<(), Error> {
     let start_time = std::time::Instant::now();
 
     // Send initial "gathering info" message
-    let reply = ctx.say("🔍 Gathering diagnostic information...").await?;
+    let reply = ctx.say("Gathering diagnostic information...").await?;
 
     // Calculate API latency
     let api_start = std::time::Instant::now();
@@ -103,13 +103,13 @@ pub async fn status(ctx: Context<'_>) -> Result<(), Error> {
 
     // Create comprehensive status embed
     let mut embed = serenity::CreateEmbed::new()
-        .title("🤖 Bot Status & Diagnostics")
+        .title("Bot Status & Diagnostics")
         .color(0x00ff00) // Green for healthy status
         .timestamp(serenity::Timestamp::now());
 
     // Basic bot information
     embed = embed.field(
-        "🤖 Bot Information",
+        "Bot Information",
         format!(
             "**Name:** {}\n**ID:** {}\n**Status:** ✅ Online & Responsive\n**API Latency:** {}ms",
             current_user_name, bot_user_id, api_latency
@@ -119,7 +119,7 @@ pub async fn status(ctx: Context<'_>) -> Result<(), Error> {
 
     // System information
     embed = embed.field(
-        "⚙️ System Information",
+        "System Information",
         format!(
             "**Process ID:** {}\n**Timestamp:** <t:{}:F>\n**Response Time:** {}ms",
             process_id,
@@ -152,7 +152,7 @@ pub async fn status(ctx: Context<'_>) -> Result<(), Error> {
         )
     };
 
-    embed = embed.field("📊 Discord Statistics", stats_text, true);
+    embed = embed.field("Discord Statistics", stats_text, true);
 
     // Current guild information
     if let (Some(name), Some(members), Some(roles)) =
@@ -162,7 +162,7 @@ pub async fn status(ctx: Context<'_>) -> Result<(), Error> {
             "**Guild:** {}\n**Members:** {}\n**Bot Roles:** {}",
             name, members, roles
         );
-        embed = embed.field("🏠 Current Guild", guild_text, true);
+        embed = embed.field("Current Guild", guild_text, true);
     }
 
     // Bot capabilities and features
@@ -178,12 +178,12 @@ pub async fn status(ctx: Context<'_>) -> Result<(), Error> {
         "✅ Utility Commands",
     ];
 
-    embed = embed.field("🔧 Bot Capabilities", capabilities.join("\n"), false);
+    embed = embed.field("Bot Capabilities", capabilities.join("\n"), false);
 
     // Gateway intents information
     let intents_info = "**Configured Intents:**\n• Guild Messages ✅\n• Direct Messages ✅\n• Message Content ✅\n• Guild Members ✅\n\n*If user counts show 0, the bot may need time to cache member data or guilds may have member count disabled.*";
 
-    embed = embed.field("🔗 Gateway Intents", intents_info, false);
+    embed = embed.field("Gateway Intents", intents_info, false);
 
     // Version and build information
     let version_info = format!(
@@ -191,7 +191,7 @@ pub async fn status(ctx: Context<'_>) -> Result<(), Error> {
         env!("CARGO_PKG_VERSION")
     );
 
-    embed = embed.field("📦 Version Information", version_info, true);
+    embed = embed.field("Version Information", version_info, true);
 
     // Health check summary
     let health_checks = [
@@ -203,12 +203,12 @@ pub async fn status(ctx: Context<'_>) -> Result<(), Error> {
         "✅ Error Recovery",
     ];
 
-    embed = embed.field("🏥 Health Checks", health_checks.join("\n"), true);
+    embed = embed.field("Health Checks", health_checks.join("\n"), true);
 
     // Available commands count
     let command_count = ctx.framework().options().commands.len();
     embed = embed.field(
-        "📋 Commands Available",
+        "Commands Available",
         format!(
             "**Total Commands:** {}\n**Type:** `-help` for list",
             command_count
@@ -227,7 +227,7 @@ pub async fn status(ctx: Context<'_>) -> Result<(), Error> {
         .edit(
             ctx,
             poise::CreateReply::default()
-                .content("📊 **Diagnostic Report Complete**")
+                .content("**Diagnostic Report Complete**")
                 .embed(embed),
         )
         .await?;

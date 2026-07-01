@@ -25,6 +25,13 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 lazy_static = "1.4"
 image = "0.24"
+# Chart/infographic rendering for the -stats command: imageproc gives us
+# filled rects + text drawing on top of the `image` crate, and rusttype is the
+# (pure-Rust, no native deps) font rasterizer it uses. Fonts are bundled
+# in-tree (assets/fonts) and include_bytes!'d, so there is no runtime font
+# lookup.
+imageproc = "0.23"
+rusttype = "0.9"
 # reqwest 0.12 across the whole crate (also the version songbird 0.6 uses, so
 # there's a single reqwest in the tree). rustls only, no OpenSSL.
 reqwest = { version = "0.12", features = [
