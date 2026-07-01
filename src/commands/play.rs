@@ -1,22 +1,21 @@
+use std::sync::Arc;
+
 use crate::{Context, Error};
 use lazy_static::lazy_static;
 use poise::serenity_prelude as serenity;
 use songbird::input::{Compose, YoutubeDl};
-use songbird::typemap::TypeMapKey;
+use songbird::tracks::Track;
 
 lazy_static! {
-    // Shared HTTP client used by yt-dlp inputs to stream audio. songbird 0.4
-    // expects a reqwest 0.11 `Client`, which is the same version this crate
-    // already depends on.
-    static ref HTTP_CLIENT: reqwest::Client = reqwest::Client::new();
+    // Shared HTTP client handed to songbird's yt-dlp source. songbird 0.6 speaks
+    // reqwest 0.12, so this uses the aliased `reqwest012` dep (cargo unifies it
+    // with songbird's own copy) rather than the crate-wide reqwest 0.11.
+    static ref HTTP_CLIENT: reqwest012::Client = reqwest012::Client::new();
 }
 
-// We stash a human-readable title on each queued track so `-queue` can list it
-// without re-invoking yt-dlp.
-struct TrackTitleKey;
-impl TypeMapKey for TrackTitleKey {
-    type Value = String;
-}
+// We stash a human-readable title on each queued track (as its songbird track
+// `data`) so `-queue` can list it without re-invoking yt-dlp.
+type TrackTitle = Arc<String>;
 
 /// The voice channel the command author is currently sitting in, if any.
 ///
@@ -128,17 +127,14 @@ pub async fn play(
         }
     };
 
-    let (position, handle) = {
+    // Attach the resolved title as the track's `data` so `-queue` can show it.
+    let track_title: TrackTitle = Arc::new(title.clone());
+    let track = Track::new_with_data(src.into(), track_title);
+    let position = {
         let mut handler = handler_lock.lock().await;
-        let handle = handler.enqueue_input(src.into()).await;
-        (handler.queue().len(), handle)
+        handler.enqueue(track).await;
+        handler.queue().len()
     };
-
-    handle
-        .typemap()
-        .write()
-        .await
-        .insert::<TrackTitleKey>(title.clone());
 
     let content = if position <= 1 {
         format!("▶️ Now playing: **{title}**")
@@ -249,13 +245,8 @@ pub async fn queue(ctx: Context<'_>) -> Result<(), Error> {
 
     let mut lines = Vec::new();
     for (i, handle) in tracks.iter().take(10).enumerate() {
-        let title = handle
-            .typemap()
-            .read()
-            .await
-            .get::<TrackTitleKey>()
-            .cloned()
-            .unwrap_or_else(|| "unknown track".to_string());
+        // Every track we enqueue carries its title as `Arc<String>` data.
+        let title = handle.data::<String>();
         if i == 0 {
             lines.push(format!("▶️ {title}"));
         } else {

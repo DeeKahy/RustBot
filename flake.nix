@@ -7,16 +7,30 @@
   # rustbot crate instead of all ~450 deps every time. Pinned to v0.20.3, the
   # last line that supports nixpkgs 24.11/25.05 (master now requires 25.11).
   inputs.crane.url = "github:ipetkov/crane/v0.20.3";
+  # songbird 0.6's DAVE stack (davey -> openmls) needs a newer rustc than the one
+  # nixpkgs 25.05 ships (1.86). rust-overlay lets us build with a current stable
+  # toolchain while the rest of the system stays on the pinned nixpkgs.
+  inputs.rust-overlay = {
+    url = "github:oxalica/rust-overlay";
+    inputs.nixpkgs.follows = "nixpkgs";
+  };
 
-  outputs = { self, nixpkgs, crane }:
+  outputs = { self, nixpkgs, crane, rust-overlay }:
     let
       systems = [ "x86_64-linux" "aarch64-linux" ];
-      forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
+      forAllSystems = f: nixpkgs.lib.genAttrs systems (system:
+        f (import nixpkgs {
+          inherit system;
+          overlays = [ (import rust-overlay) ];
+        }));
     in
     {
       packages = forAllSystems (pkgs:
         let
-          craneLib = crane.mkLib pkgs;
+          # Build with a current stable rustc (openmls uses Rust 1.87+ features);
+          # only the build toolchain changes, not the system.
+          craneLib = (crane.mkLib pkgs).overrideToolchain
+            (p: p.rust-bin.stable."1.88.0".default);
 
           # All TLS is rustls (serenity rustls_backend, reqwest rustls-tls). The one
           # native dependency is libopus, needed by songbird's voice encoder; its
@@ -26,7 +40,9 @@
             version = "0.1.0";
             src = craneLib.cleanCargoSource self;
             strictDeps = true;
-            nativeBuildInputs = [ pkgs.pkg-config pkgs.makeWrapper ];
+            # cmake is a fallback: songbird 0.6's opus2 -> libopus_sys prefers the
+            # system libopus via pkg-config, but can build a bundled copy with cmake.
+            nativeBuildInputs = [ pkgs.pkg-config pkgs.makeWrapper pkgs.cmake ];
             buildInputs = [ pkgs.libopus ];
           };
 
