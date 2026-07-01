@@ -352,7 +352,7 @@ pub fn render(info: &Infographic) -> Option<Vec<u8>> {
             Rgba([52, 152, 219, 255])
         };
         fill_rect(&mut c, color, bx, baseline - bh, col_w, bh.max(2));
-        if h % 3 == 0 {
+        if h.is_multiple_of(3) {
             draw_text(&mut c, MUTED, bx, baseline + 6, 16.0, false, &h.to_string());
         }
     }
