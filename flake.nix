@@ -14,8 +14,14 @@
     url = "github:oxalica/rust-overlay";
     inputs.nixpkgs.follows = "nixpkgs";
   };
+  # yt-dlp needs frequent updates to keep working against YouTube's changing
+  # anti-bot challenges — the 25.05-pinned yt-dlp is too old (can't solve the JS
+  # `n` challenge, so audio downloads 403). Track yt-dlp from unstable, which
+  # bundles deno + yt-dlp-ejs (the challenge solver). Bump with
+  # `nix flake update nixpkgs-unstable` if playback breaks again.
+  inputs.nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-  outputs = { self, nixpkgs, crane, rust-overlay }:
+  outputs = { self, nixpkgs, crane, rust-overlay, nixpkgs-unstable }:
     let
       systems = [ "x86_64-linux" "aarch64-linux" ];
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system:
@@ -27,6 +33,10 @@
     {
       packages = forAllSystems (pkgs:
         let
+          # yt-dlp from unstable (self-contained: bundles deno + yt-dlp-ejs) so it
+          # can solve YouTube's current JS challenges; everything else stays on 25.05.
+          pkgsUnstable = import nixpkgs-unstable { inherit (pkgs) system; };
+
           # Build with a current stable rustc (openmls uses Rust 1.87+ features);
           # only the build toolchain changes, not the system.
           craneLib = (crane.mkLib pkgs).overrideToolchain
@@ -63,7 +73,7 @@
               mkdir -p $out/share/rustbot
               cp -r assets $out/share/rustbot/assets
               wrapProgram $out/bin/rustbot \
-                --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.yt-dlp pkgs.ffmpeg ]}
+                --prefix PATH : ${pkgs.lib.makeBinPath [ pkgsUnstable.yt-dlp pkgs.ffmpeg ]}
             '';
             meta.mainProgram = "rustbot";
           });
