@@ -73,12 +73,38 @@ pub async fn play(
         }
     };
 
-    // Resolving a URL/search via yt-dlp can take a couple of seconds, so let the
-    // user know we're working on it.
-    ctx.defer_or_broadcast().await.ok();
+    // Send an immediate reply so the user sees something the instant they run the
+    // command; we edit this same message as each step completes (or fails).
+    let reply = ctx.say("🔊 Joining voice channel…").await?;
 
-    // Build the source and resolve its metadata up front. This doubles as
-    // validation: a bad URL / no search hit fails here before we join.
+    // Join (or move to) the author's channel first, so a connection problem
+    // surfaces right away rather than after yt-dlp has run.
+    let handler_lock = match manager.join(guild_id, connect_to).await {
+        Ok(handler) => handler,
+        Err(e) => {
+            log::error!("voice join failed in guild {guild_id}: {e:?}");
+            reply
+                .edit(
+                    ctx,
+                    poise::CreateReply::default().content(format!(
+                        "❌ Couldn't connect to the voice channel.\n\
+                         ```\n{e:?}\n```\n\
+                         (This is usually a network/voice-server issue, not the URL.)"
+                    )),
+                )
+                .await?;
+            return Ok(());
+        }
+    };
+
+    reply
+        .edit(
+            ctx,
+            poise::CreateReply::default().content(format!("🔍 Loading `{query}`…")),
+        )
+        .await?;
+
+    // Resolve the source (runs yt-dlp; also validates the URL / search hit).
     let is_url = query.starts_with("http://") || query.starts_with("https://");
     let mut src = if is_url {
         YoutubeDl::new(HTTP_CLIENT.clone(), query.clone())
@@ -89,17 +115,14 @@ pub async fn play(
     let title = match src.aux_metadata().await {
         Ok(meta) => meta.title.unwrap_or_else(|| query.clone()),
         Err(e) => {
-            ctx.say(format!("❌ Couldn't find anything for `{query}`: {e}"))
-                .await?;
-            return Ok(());
-        }
-    };
-
-    // Join (or move to) the author's channel.
-    let handler_lock = match manager.join(guild_id, connect_to).await {
-        Ok(handler) => handler,
-        Err(e) => {
-            ctx.say(format!("❌ Couldn't join the voice channel: {e}"))
+            log::error!("yt-dlp metadata failed for {query:?}: {e:?}");
+            reply
+                .edit(
+                    ctx,
+                    poise::CreateReply::default().content(format!(
+                        "❌ Couldn't load `{query}`.\n```\n{e:?}\n```"
+                    )),
+                )
                 .await?;
             return Ok(());
         }
@@ -117,12 +140,14 @@ pub async fn play(
         .await
         .insert::<TrackTitleKey>(title.clone());
 
-    if position <= 1 {
-        ctx.say(format!("▶️ Now playing: **{title}**")).await?;
+    let content = if position <= 1 {
+        format!("▶️ Now playing: **{title}**")
     } else {
-        ctx.say(format!("➕ Queued **{title}** (position {} in line)", position - 1))
-            .await?;
-    }
+        format!("➕ Queued **{title}** (position {} in line)", position - 1)
+    };
+    reply
+        .edit(ctx, poise::CreateReply::default().content(content))
+        .await?;
 
     Ok(())
 }
