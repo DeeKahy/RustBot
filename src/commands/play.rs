@@ -1,16 +1,44 @@
 use std::sync::Arc;
+use std::time::Duration;
+
+use async_trait::async_trait;
 
 use crate::{Context, Error};
 use lazy_static::lazy_static;
 use poise::serenity_prelude as serenity;
 use songbird::input::{Compose, YoutubeDl};
 use songbird::tracks::Track;
+use songbird::{Event, EventContext, EventHandler as VoiceEventHandler, Songbird};
 
 lazy_static! {
-    // Shared HTTP client handed to songbird's yt-dlp source. songbird 0.6 speaks
-    // reqwest 0.12, so this uses the aliased `reqwest012` dep (cargo unifies it
-    // with songbird's own copy) rather than the crate-wide reqwest 0.11.
-    static ref HTTP_CLIENT: reqwest012::Client = reqwest012::Client::new();
+    // Shared HTTP client handed to songbird's yt-dlp source (reqwest 0.12, the
+    // version songbird speaks).
+    static ref HTTP_CLIENT: reqwest::Client = reqwest::Client::new();
+}
+
+/// How long the bot may sit in a voice channel with nothing queued before it
+/// disconnects on its own.
+const IDLE_TIMEOUT: Duration = Duration::from_secs(90);
+
+/// Periodic voice event that leaves the channel once the queue has run dry, so
+/// the bot doesn't idle in voice forever after the last track ends.
+struct IdleLeaver {
+    manager: Arc<Songbird>,
+    guild_id: serenity::GuildId,
+}
+
+#[async_trait]
+impl VoiceEventHandler for IdleLeaver {
+    async fn act(&self, _ctx: &EventContext<'_>) -> Option<Event> {
+        match self.manager.get(self.guild_id) {
+            Some(call) if !call.lock().await.queue().is_empty() => None,
+            // Empty queue (or we're no longer connected): disconnect and stop the timer.
+            _ => {
+                let _ = self.manager.remove(self.guild_id).await;
+                Some(Event::Cancel)
+            }
+        }
+    }
 }
 
 // We stash a human-readable title on each queued track (as its songbird track
@@ -99,7 +127,10 @@ pub async fn play(
         Some((g, c)) => {
             // Guard against strangers puppeting the bot: the caller must be a
             // member of the server the channel link points to.
-            if g.member(ctx.serenity_context(), ctx.author().id).await.is_err() {
+            if g.member(ctx.serenity_context(), ctx.author().id)
+                .await
+                .is_err()
+            {
                 ctx.say("❌ I couldn't verify you're a member of that server.")
                     .await?;
                 return Ok(());
@@ -121,10 +152,8 @@ pub async fn play(
             match author_voice_channel(&ctx) {
                 Some(c) => (g, c),
                 None => {
-                    ctx.say(
-                        "❌ Join a voice channel first, or paste a channel link to pick one.",
-                    )
-                    .await?;
+                    ctx.say("❌ Join a voice channel first, or paste a channel link to pick one.")
+                        .await?;
                     return Ok(());
                 }
             }
@@ -146,6 +175,7 @@ pub async fn play(
 
     // Join (or move to) the author's channel first, so a connection problem
     // surfaces right away rather than after yt-dlp has run.
+    let fresh_join = manager.get(guild_id).is_none();
     let handler_lock = match manager.join(guild_id, connect_to).await {
         Ok(handler) => handler,
         Err(e) => {
@@ -163,6 +193,18 @@ pub async fn play(
             return Ok(());
         }
     };
+
+    // On the initial join, arm an idle timer so the bot leaves once the queue
+    // empties. Only added once per session to avoid stacking timers.
+    if fresh_join {
+        handler_lock.lock().await.add_global_event(
+            Event::Periodic(IDLE_TIMEOUT, None),
+            IdleLeaver {
+                manager: manager.clone(),
+                guild_id,
+            },
+        );
+    }
 
     reply
         .edit(
@@ -186,9 +228,8 @@ pub async fn play(
             reply
                 .edit(
                     ctx,
-                    poise::CreateReply::default().content(format!(
-                        "❌ Couldn't load `{query}`.\n```\n{e:?}\n```"
-                    )),
+                    poise::CreateReply::default()
+                        .content(format!("❌ Couldn't load `{query}`.\n```\n{e:?}\n```")),
                 )
                 .await?;
             return Ok(());
@@ -222,7 +263,8 @@ pub async fn skip(ctx: Context<'_>) -> Result<(), Error> {
     let guild_id = match ctx.guild_id() {
         Some(g) => g,
         None => {
-            ctx.say("❌ This command only works inside a server.").await?;
+            ctx.say("❌ This command only works inside a server.")
+                .await?;
             return Ok(());
         }
     };
@@ -258,7 +300,8 @@ pub async fn stop(ctx: Context<'_>) -> Result<(), Error> {
     let guild_id = match ctx.guild_id() {
         Some(g) => g,
         None => {
-            ctx.say("❌ This command only works inside a server.").await?;
+            ctx.say("❌ This command only works inside a server.")
+                .await?;
             return Ok(());
         }
     };
@@ -285,7 +328,8 @@ pub async fn queue(ctx: Context<'_>) -> Result<(), Error> {
     let guild_id = match ctx.guild_id() {
         Some(g) => g,
         None => {
-            ctx.say("❌ This command only works inside a server.").await?;
+            ctx.say("❌ This command only works inside a server.")
+                .await?;
             return Ok(());
         }
     };
@@ -325,22 +369,19 @@ pub async fn queue(ctx: Context<'_>) -> Result<(), Error> {
         lines.push(format!("…and {} more", tracks.len() - 10));
     }
 
-    ctx.say(format!("🎶 **Queue**\n{}", lines.join("\n"))).await?;
+    ctx.say(format!("🎶 **Queue**\n{}", lines.join("\n")))
+        .await?;
     Ok(())
 }
 
 /// Leave the voice channel (also clears the queue).
-#[poise::command(
-    prefix_command,
-    slash_command,
-    guild_only,
-    aliases("disconnect", "dc")
-)]
+#[poise::command(prefix_command, slash_command, guild_only, aliases("disconnect", "dc"))]
 pub async fn leave(ctx: Context<'_>) -> Result<(), Error> {
     let guild_id = match ctx.guild_id() {
         Some(g) => g,
         None => {
-            ctx.say("❌ This command only works inside a server.").await?;
+            ctx.say("❌ This command only works inside a server.")
+                .await?;
             return Ok(());
         }
     };

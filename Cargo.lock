@@ -3277,6 +3277,7 @@ name = "rustbot"
 version = "0.1.0"
 dependencies = [
  "aes-gcm",
+ "async-trait",
  "base64 0.21.7",
  "chrono",
  "chrono-tz",
@@ -3291,7 +3292,6 @@ dependencies = [
  "parking_lot 0.12.4",
  "poise",
  "rand 0.8.5",
- "reqwest 0.11.27",
  "reqwest 0.12.28",
  "serde",
  "serde_json",

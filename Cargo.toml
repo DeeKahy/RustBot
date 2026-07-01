@@ -25,18 +25,13 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 lazy_static = "1.4"
 image = "0.24"
-reqwest = { version = "0.11", features = [
+# reqwest 0.12 across the whole crate (also the version songbird 0.6 uses, so
+# there's a single reqwest in the tree). rustls only, no OpenSSL.
+reqwest = { version = "0.12", features = [
     "stream",
     "rustls-tls",
     "json",
 ], default-features = false }
-# songbird 0.6 speaks reqwest 0.12, so its YoutubeDl::new wants a 0.12 Client.
-# Pull one in under an alias (cargo unifies it with songbird's copy) purely for
-# the voice source client; the rest of the bot stays on reqwest 0.11.
-reqwest012 = { package = "reqwest", version = "0.12", default-features = false, features = [
-    "rustls-tls",
-    "stream",
-] }
 gif = "0.12"
 tempfile = "3.8"
 aes-gcm = "0.10"
@@ -46,6 +41,8 @@ uuid = { version = "1.0", features = ["v4"] }
 parking_lot = "0.12"
 governor = "0.6"
 nonzero_ext = "0.3"
+# For implementing songbird's #[async_trait] EventHandler (voice idle timeout).
+async-trait = "0.1"
 # Voice support for the -play command. rustls everywhere (no OpenSSL), plus the
 # built-in track queue. Needs libopus at build time and yt-dlp + ffmpeg at runtime.
 # 0.6 is required for the DAVE protocol (Discord's E2EE voice), which newer voice

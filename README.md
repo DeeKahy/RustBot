@@ -17,8 +17,8 @@ A modern Discord bot built with Rust using the Serenity library and Poise comman
 - 📝 **Logging**: Built-in logging system for debugging and monitoring
 - ⚡ **Async**: Built with Tokio for high performance
 - 🎯 **Modern Framework**: Uses Poise for both prefix and slash commands
-- 🐳 **Docker Support**: Multi-platform Docker images for easy deployment
-- 🏠 **CasaOS Ready**: Optimized for CasaOS home server deployment
+- 🔊 **Voice / Music**: Play YouTube audio in a voice channel (songbird), incl. from a DM via a channel link
+- ❄️ **Nix Flake**: Reproducible build + hardened NixOS service module (multi-instance)
 
 ## Commands
 
@@ -37,32 +37,34 @@ A modern Discord bot built with Rust using the Serenity library and Poise comman
 - `-remind remove <id>` - Remove a specific reminder
 - `-remind clear` - Clear all your reminders
 - `-react <text>` - Add emoji reactions to a replied message spelling out the text
+- `-play <url|search> [channel link]` - Play a YouTube video's audio in a voice channel. In a server it joins your current channel; paste a `https://discord.com/channels/<server>/<channel>` link to target a specific one (works from a DM)
+- `-skip` / `-stop` / `-queue` / `-leave` - Voice playback controls (leave also aliased `-disconnect` / `-dc`)
 
-## Quick Start with Docker (Recommended)
+## Deployment (Nix flake)
 
-### Option 1: CasaOS Deployment
+RustBot ships as a flake providing `packages.default` (the bot) and
+`nixosModules.default` (a hardened, multi-instance systemd service). The build
+bundles `yt-dlp` + `ffmpeg` onto the binary's PATH and links `libopus`; voice
+also needs a working outbound network path to Discord (IPv4).
 
-**Docker Image**: `deekahy/rustbot:latest`
+Add it as an input and configure one or more instances:
 
-1. Add new application in CasaOS
-2. Use image: `deekahy/rustbot:latest`
-3. Set environment variable: `DISCORD_TOKEN=your_discord_bot_token`
-4. Start the container
+```nix
+# flake.nix
+inputs.rustbot.url = "github:DeeKahy/RustBot";
 
-### Option 3: Direct Docker Run
-
-```bash
-docker run -d \
-  --name rustbot \
-  --restart unless-stopped \
-  -e DISCORD_TOKEN=your_discord_token_here \
-  -e RUST_LOG=info \
-  -e GIT_BRANCH=main \
-  -e PROTECTED_USERS="deekahy lardum" \
-  --memory=256m \
-  --cpus=0.5 \
-  deekahy/rustbot:latest
+# in your nixosConfiguration modules:
+{
+  imports = [ inputs.rustbot.nixosModules.default ];
+  services.rustbot.instances.main = {
+    # Root-only env file with DISCORD_TOKEN, PROTECTED_USERS, RUST_LOG, …
+    environmentFile = "/var/lib/rustbot/env";
+  };
+}
 ```
+
+Build/run locally with `nix run github:DeeKahy/RustBot` (needs `DISCORD_TOKEN`
+in the environment or a `.env`).
 
 ## Development Setup
 
@@ -121,85 +123,12 @@ https://discord.com/api/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=27
 cargo run
 ```
 
-## Docker Deployment 🐳
-
-RustBot can be easily deployed using Docker for consistent cross-platform deployment.
-
-### Prerequisites for Docker
-
-- Docker installed on your system
-- Docker Hub account (for pushing images)
-
-### Building and Running with Docker
-
-#### Option 1: Using the build script (Recommended)
-
-1. **Build and optionally push to Docker Hub:**
-```bash
-./docker-build.sh your_docker_username
-```
-
-2. **Run the container:**
-```bash
-# With environment variable
-docker run -e DISCORD_TOKEN=your_token_here your_docker_username/rustbot:latest
-
-# Or with .env file
-docker run --env-file .env your_docker_username/rustbot:latest
-```
-
-#### Option 2: Manual Docker commands
-
-1. **Build the image:**
-```bash
-docker build -t your_docker_username/rustbot:latest .
-```
-
-2. **Push to Docker Hub:**
-```bash
-docker login
-docker push your_docker_username/rustbot:latest
-```
-
-3. **Run the container:**
-```bash
-docker run -e DISCORD_TOKEN=your_token_here your_docker_username/rustbot:latest
-```
-
-#### Option 3: Using Docker Compose
-
-1. **Set your Discord token:**
-```bash
-export DISCORD_TOKEN=your_token_here
-```
-
-2. **Run with Docker Compose:**
-```bash
-docker-compose up -d
-```
-
-### Docker Features
-
-- **Native Compilation**: The Docker image compiles the Rust code natively on the target architecture
-- **Multi-stage Build**: Optimized build process with dependency caching
-- **Environment Variables**: Easy configuration through environment variables
-- **Auto-restart**: Container restarts automatically if the bot crashes (when using docker-compose)
-- **Minimal Image**: Based on official Rust image with only necessary dependencies
-
-### Docker Environment Variables
+## Environment Variables
 
 - `DISCORD_TOKEN` - Your Discord bot token (required)
-- `RUST_LOG` - Log level (optional, defaults to `info`)
-- `GIT_BRANCH` - Git branch to pull from during updates (optional, defaults to `main`)
-- `PROTECTED_USERS` - Space-separated list of usernames who can use protected commands like `-update`, `-cleanup`, and `-kys` (optional, defaults to `deekahy`)
-
-### Pulling from Docker Hub
-
-Once pushed, others can run your bot directly:
-
-```bash
-docker run -e DISCORD_TOKEN=their_token_here your_docker_username/rustbot:latest
-```
+- `RUST_LOG` - Log level (optional; `warn,rustbot=info,songbird=info` is a good default — plain `info` is very noisy)
+- `GIT_BRANCH` - Git branch to pull from during `-update` (optional, defaults to `main`)
+- `PROTECTED_USERS` - Space-separated usernames allowed to use protected commands like `-update`, `-cleanup`, and `-kys` (optional, defaults to `deekahy`)
 
 ## Adding New Commands
 
