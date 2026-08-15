@@ -289,6 +289,41 @@ fn generate_unique_request_id() -> String {
     Uuid::new_v4().to_string()
 }
 
+// ---------------------------------------------------------------------------
+// Migration to the website.
+//
+// Parking moved to parkering.smallapp.cc, which verifies that people are
+// actually students before it will register anything.
+//
+// There is deliberately no automatic cutoff. This bot keeps parking everyone
+// who was already registered, for as long as it is running, so nobody loses a
+// morning to a date passing unnoticed. Retiring it is a manual decision for
+// once people have actually moved across. What it will not do is take new
+// signups, and it says where to go on every message it sends.
+// ---------------------------------------------------------------------------
+
+const MIGRATION_URL: &str = "https://parkering.smallapp.cc";
+
+/// Appended to every parking message the bot sends, so nobody can miss it.
+fn migration_notice() -> String {
+    format!(
+        "\n\n———\n📣 **Parking has moved to {MIGRATION_URL}**\nSign in there with your @student.aau.dk email and set up your car. This bot still parks you for now, but it will be switched off once everyone has moved over."
+    )
+}
+
+/// The one-time announcement DM sent by /park announce_migration.
+fn migration_announcement() -> String {
+    format!(
+        "👋 **Parking is moving to a website**\n\nFrom now on parking is handled at **{MIGRATION_URL}** instead of this bot.\n\n**What you need to do:**\n1. Open {MIGRATION_URL}\n2. Sign in with your **@student.aau.dk** email (you get a link, no password)\n3. Save your number plate and phone number\n4. Pick which days and times you want to park automatically\n\nThe new site can also send you a notification when your parking is registered, and tell you if it fails.\n\n⚠️ **Your schedule here will not move itself**, so please set it up on the site. This bot keeps parking you in the meantime, and will only be switched off once everyone has moved across. You will not lose a morning over it.\n\nYour details are still saved here. Nothing is lost."
+    )
+}
+
+fn migration_signup_message() -> String {
+    format!(
+        "👋 **New signups happen on the website now**\n\nParking has moved to **{MIGRATION_URL}**. Sign in with your @student.aau.dk email, save your car and phone, and pick your days there.\n\nThis bot only still parks people who were already registered before the move."
+    )
+}
+
 fn create_parking_payload(plate: &str, phone: &str) -> serde_json::Value {
     json!({
         "email": "",
@@ -307,10 +342,89 @@ fn create_parking_payload(plate: &str, phone: &str) -> serde_json::Value {
     })
 }
 
+/// Tell everyone registered here to move to the website (bot owner only)
+#[poise::command(prefix_command, slash_command, rename = "announce_migration")]
+pub async fn announce_migration(
+    ctx: Context<'_>,
+    #[description = "Set to true to actually send the DMs"] confirm: Option<bool>,
+) -> Result<(), Error> {
+    if !crate::utils::is_protected_user(&ctx.author().name) {
+        ctx.send(
+            poise::CreateReply::default()
+                .content("🚫 Only the bot owner can send the migration announcement.")
+                .ephemeral(true),
+        )
+        .await?;
+        return Ok(());
+    }
+
+    let user_ids: Vec<u64> = {
+        let data_guard = PARKING_DATA.read();
+        data_guard.users.keys().copied().collect()
+    };
+
+    // Deliberately opt-in: this DMs real people, and running it twice is spam.
+    if confirm != Some(true) {
+        ctx.send(
+            poise::CreateReply::default()
+                .content(format!(
+                    "This would DM **{}** registered users.\nRun `/park announce_migration confirm:true` to actually send it.",
+                    user_ids.len()
+                ))
+                .ephemeral(true),
+        )
+        .await?;
+        return Ok(());
+    }
+
+    ctx.defer_ephemeral().await?;
+
+    let http = ctx.serenity_context().http.clone();
+    let announcement = migration_announcement();
+    let mut sent = 0usize;
+    let mut failed = 0usize;
+
+    for uid in &user_ids {
+        match send_dm_to_user(&http, UserId::new(*uid), &announcement).await {
+            Ok(_) => sent += 1,
+            Err(e) => {
+                failed += 1;
+                log::warn!("Migration announcement to {} failed: {}", uid, e);
+            }
+        }
+        // Gentle on Discord's DM rate limits; this is a one-off broadcast.
+        tokio::time::sleep(TokioDuration::from_millis(600)).await;
+    }
+
+    log::info!(
+        "Migration announcement sent to {} users ({} failed)",
+        sent,
+        failed
+    );
+
+    ctx.send(
+        poise::CreateReply::default()
+            .content(format!(
+                "📣 Migration announcement sent.\n✅ Delivered: **{}**\n❌ Failed: **{}** (usually means no mutual server or DMs closed)",
+                sent, failed
+            ))
+            .ephemeral(true),
+    )
+    .await?;
+
+    Ok(())
+}
+
 /// Park your vehicle using mobile parking service
 #[poise::command(
     slash_command,
-    subcommands("park_now", "park_info", "park_clear", "park_schedule")
+    subcommands(
+        "park_now",
+        "park_info",
+        "park_clear",
+        "park_schedule",
+        "announce_migration"
+    )
 )]
 pub async fn park(_ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
@@ -348,6 +462,18 @@ pub async fn park_now(
         let data_guard = PARKING_DATA.read();
         data_guard.users.get(&user_id).cloned()
     };
+
+    // Anyone not already registered here is a new signup, and new signups
+    // belong on the website. Existing users keep working until the cutoff.
+    if current_user_info.is_none() {
+        ctx.send(
+            poise::CreateReply::default()
+                .content(migration_signup_message())
+                .ephemeral(true),
+        )
+        .await?;
+        return Ok(());
+    }
 
     let (final_plate, final_phone) = match (plate, phone_number) {
         // Both provided - validate and save
@@ -472,9 +598,10 @@ pub async fn park_now(
     match execute_parking_request(&final_plate, &final_phone).await {
         Ok(_) => {
             let success_message = format!(
-                "✅ **Parking confirmed!**\n🚗 **Plate:** {}\n📱 **Phone:** +45 {}\n⏱️ **Duration:** 10 hours\n📍 **Area:** ADK-4688\n\n📱 **Please check your SMS** for confirmation!\n💾 *Your information has been saved securely*",
+                "✅ **Parking confirmed!**\n🚗 **Plate:** {}\n📱 **Phone:** +45 {}\n⏱️ **Duration:** 10 hours\n📍 **Area:** ADK-4688\n\n📱 **Please check your SMS** for confirmation!\n💾 *Your information has been saved securely*{}",
                 final_plate,
-                final_phone
+                final_phone,
+                migration_notice()
             );
 
             initial_reply
@@ -495,8 +622,9 @@ pub async fn park_now(
         }
         Err(e) => {
             let error_message = format!(
-                "❌ **Parking request failed**\n**Error:** {}\n\n🔧 Please try again in a few minutes.",
-                e
+                "❌ **Parking request failed**\n**Error:** {}\n\n🔧 Please try again in a few minutes.{}",
+                e,
+                migration_notice()
             );
 
             initial_reply
@@ -933,9 +1061,10 @@ async fn check_and_execute_parking(http: &Http) -> Result<(), Error> {
 
                 // Send success DM
                 let message = format!(
-                    "✅ **Automatic parking registered!**\n🚗 **Plate:** {}\n📱 **Phone:** +45{}\n⏱️ **Duration:** 10 hours\n📍 **Area:** ADK-4688\n\n📱 **Please check your SMS** for confirmation!",
+                    "✅ **Automatic parking registered!**\n🚗 **Plate:** {}\n📱 **Phone:** +45{}\n⏱️ **Duration:** 10 hours\n📍 **Area:** ADK-4688\n\n📱 **Please check your SMS** for confirmation!{}",
                     user_info.plate,
-                    user_info.phone_number
+                    user_info.phone_number,
+                    migration_notice()
                 );
 
                 if let Err(e) = send_dm_to_user(http, UserId::new(user_id), &message).await {
@@ -952,8 +1081,9 @@ async fn check_and_execute_parking(http: &Http) -> Result<(), Error> {
             Err(e) => {
                 // Send failure DM
                 let message = format!(
-                    "❌ **Automatic parking failed**\n**Error:** {}\n\n🔧 You may need to try parking manually with `/park now`",
-                    e
+                    "❌ **Automatic parking failed**\n**Error:** {}\n\n🔧 You may need to try parking manually with `/park now`{}",
+                    e,
+                    migration_notice()
                 );
 
                 if let Err(dm_err) = send_dm_to_user(http, UserId::new(user_id), &message).await {
@@ -1036,10 +1166,11 @@ async fn process_missed_parking_requests(http: &Http) -> Result<(), Error> {
 
                 // Send success DM with note about recovery
                 let message = format!(
-                    "✅ **Missed parking request recovered!**\n🚗 **Plate:** {}\n📱 **Phone:** +45{}\n⏱️ **Duration:** 10 hours\n📍 **Area:** ADK-4688\n⏰ **Originally scheduled:** <t:{}:t>\n\n📱 **Please check your SMS** for confirmation!\n\n🤖 *This was automatically processed after bot restart*",
+                    "✅ **Missed parking request recovered!**\n🚗 **Plate:** {}\n📱 **Phone:** +45{}\n⏱️ **Duration:** 10 hours\n📍 **Area:** ADK-4688\n⏰ **Originally scheduled:** <t:{}:t>\n\n📱 **Please check your SMS** for confirmation!\n\n🤖 *This was automatically processed after bot restart*{}",
                     user_info.plate,
                     user_info.phone_number,
-                    missed_time.timestamp()
+                    missed_time.timestamp(),
+                    migration_notice()
                 );
 
                 if let Err(e) = send_dm_to_user(http, UserId::new(user_id), &message).await {
@@ -1064,9 +1195,10 @@ async fn process_missed_parking_requests(http: &Http) -> Result<(), Error> {
 
                 // Send failure DM
                 let message = format!(
-                    "❌ **Missed parking request failed**\n**Error:** {}\n⏰ **Originally scheduled:** <t:{}:t>\n\n🔧 You may need to try parking manually with `/park now`\n\n🤖 *This was a recovery attempt after bot restart*",
+                    "❌ **Missed parking request failed**\n**Error:** {}\n⏰ **Originally scheduled:** <t:{}:t>\n\n🔧 You may need to try parking manually with `/park now`\n\n🤖 *This was a recovery attempt after bot restart*{}",
                     e,
-                    missed_time.timestamp()
+                    missed_time.timestamp(),
+                    migration_notice()
                 );
 
                 if let Err(dm_err) = send_dm_to_user(http, UserId::new(user_id), &message).await {
@@ -1130,10 +1262,11 @@ async fn check_parking_expiry(http: &Http) -> Result<(), Error> {
     for (user_id, plate, expiry_time) in expiry_notifications {
         let expiry_time_danish = expiry_time.with_timezone(&Copenhagen);
         let message = format!(
-            "⏰ **Parking expires soon!**\n🚗 **Plate:** {}\n📍 **Area:** ADK-4688\n⏱️ **Expires:** <t:{}:t> ({})\n\n🚗 Your parking will expire in 1 minute!",
+            "⏰ **Parking expires soon!**\n🚗 **Plate:** {}\n📍 **Area:** ADK-4688\n⏱️ **Expires:** <t:{}:t> ({})\n\n🚗 Your parking will expire in 1 minute!{}",
             plate,
             expiry_time.timestamp(),
-            expiry_time_danish.format("%H:%M Danish time")
+            expiry_time_danish.format("%H:%M Danish time"),
+            migration_notice()
         );
 
         if let Err(e) = send_dm_to_user(http, UserId::new(user_id), &message).await {
