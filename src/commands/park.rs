@@ -295,41 +295,37 @@ fn generate_unique_request_id() -> String {
 // Parking moved to parkering.smallapp.cc, which verifies that people are
 // actually students before it will register anything.
 //
-// The messages below announce a stop date. The bot does NOT enforce it, and
-// that mismatch is deliberate, not an oversight:
+// The messages warn that this bot will be switched off "soon, without
+// warning", and that is literally true: there is no cutoff check in this file.
+// Retirement is a manual decision, taken once people have actually moved.
 //
-//   - the date exists to get people to actually move, because a migration with
-//     no deadline is one nobody gets round to
-//   - the bot keeps parking everyone already registered anyway, so a student
-//     who ignores the announcement still gets parked instead of turning up to
-//     a fine
+// An earlier version named a fixed date. That date passed while the bot kept
+// running, which teaches people the warnings are noise. An open-ended warning
+// cannot go stale, so it stays honest however long retirement takes.
 //
-// So do not "fix" this by adding a cutoff check. Retiring the bot is a manual
-// decision to take once people have genuinely moved across. What it will not
-// do is take new signups, and it says where to go on every message it sends.
+// What the bot will not do is take new signups, and it says where to go on
+// every message it sends.
 // ---------------------------------------------------------------------------
 
 const MIGRATION_URL: &str = "https://parkering.smallapp.cc";
-/// Announced only. Nothing in this file checks it; see the note above.
-const MIGRATION_DEADLINE: &str = "1 September 2026";
 
 /// Appended to every parking message the bot sends, so nobody can miss it.
 fn migration_notice() -> String {
     format!(
-        "\n\n———\n📣 **Parking has moved to {MIGRATION_URL}**\nSign in there with your @student.aau.dk email and set up your car. This bot stops parking on **{MIGRATION_DEADLINE}**."
+        "\n\n———\n📣 **Parking has moved to {MIGRATION_URL}**\nSign in there with your @student.aau.dk email and set your car up. **This bot will be shut down soon, without warning.** Do it now so you do not lose a morning."
     )
 }
 
 /// The one-time announcement DM sent by /park announce_migration.
 fn migration_announcement() -> String {
     format!(
-        "👋 **Parking is moving to a website**\n\nFrom now on parking is handled at **{MIGRATION_URL}** instead of this bot.\n\n**What you need to do:**\n1. Open {MIGRATION_URL}\n2. Sign in with your **@student.aau.dk** email (you get a link, no password)\n3. Save your number plate and phone number\n4. Pick which days and times you want to park automatically\n\nThe new site can also send you a notification when your parking is registered, and tell you if it fails.\n\n⚠️ **This bot stops parking on {MIGRATION_DEADLINE}.** Your schedule here keeps running until then, but it will not move itself, so please set it up on the site before the deadline.\n\nYour details stay saved here in the meantime. Nothing is lost."
+        "👋 **Parking is moving to a website**\n\nFrom now on parking is handled at **{MIGRATION_URL}** instead of this bot.\n\n**What you need to do:**\n1. Open {MIGRATION_URL}\n2. Sign in with your **@student.aau.dk** email (you get a link, no password)\n3. Save your number plate and phone number\n4. Pick which days and times you want to park automatically\n\nThe new site can also send you a notification when your parking is registered, and tell you if it fails.\n\n⚠️ **This bot will be shut down soon, without warning.** Your schedule here will not move itself, so set it up on the site now rather than waiting. Once the bot is gone, anyone who has not moved simply stops being parked.\n\nYour details stay saved here until then. Nothing is lost."
     )
 }
 
 fn migration_signup_message() -> String {
     format!(
-        "👋 **New signups happen on the website now**\n\nParking has moved to **{MIGRATION_URL}**. Sign in with your @student.aau.dk email, save your car and phone, and pick your days there.\n\nThis bot only still parks people who were already registered, and it stops on {MIGRATION_DEADLINE}."
+        "👋 **New signups happen on the website now**\n\nParking has moved to **{MIGRATION_URL}**. Sign in with your @student.aau.dk email, save your car and phone, and pick your days there.\n\nThis bot no longer takes new signups, and it will be shut down soon without warning."
     )
 }
 

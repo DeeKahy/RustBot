@@ -1,68 +1,43 @@
 use crate::{Context, Error};
 use poise::serenity_prelude as serenity;
 
-/// Generate and display the bot's invite link
+/// Point people at the website instead of inviting a bot that is being retired
 ///
-/// This command creates an invite link for the bot with the necessary permissions
-/// to function properly in servers. The link includes permissions for reading messages,
-/// sending messages, managing messages, and other essential bot functions.
+/// Previously this produced an OAuth invite URL. The bot is being retired, so it
+/// now explains that and links to parkering.smallapp.cc.
 ///
 /// # Usage
-/// - `-invite` or `/invite` - Show the bot invite link
+/// - `-invite` or `/invite` - Explain the retirement and link the website
 #[poise::command(prefix_command, slash_command)]
 pub async fn invite(ctx: Context<'_>) -> Result<(), Error> {
     log::info!("Invite command called by {}", ctx.author().name);
 
-    // Get the bot's application ID
-    let bot_id = ctx.serenity_context().cache.current_user().id;
-
-    // Define the permissions the bot needs
-    // These are the essential permissions for the bot to function properly
-    let permissions = serenity::Permissions::SEND_MESSAGES
-        | serenity::Permissions::READ_MESSAGE_HISTORY
-        | serenity::Permissions::VIEW_CHANNEL
-        | serenity::Permissions::EMBED_LINKS
-        | serenity::Permissions::ATTACH_FILES
-        | serenity::Permissions::USE_EXTERNAL_EMOJIS
-        | serenity::Permissions::ADD_REACTIONS
-        | serenity::Permissions::MANAGE_MESSAGES
-        | serenity::Permissions::READ_MESSAGE_HISTORY;
-
-    // Create the invite URL
-    let invite_url = format!(
-        "https://discord.com/api/oauth2/authorize?client_id={}&permissions={}&scope=bot%20applications.commands",
-        bot_id,
-        permissions.bits()
-    );
-
+    // The bot is being retired, so handing out a link to add it to another
+    // server would be setting that server up to lose the feature shortly.
+    // Point people at the website instead, which is where parking now lives.
     let embed = serenity::CreateEmbed::new()
-        .title("🤖 Invite Me to Your Server!")
-        .description("Click the link below to add me to your Discord server!")
-        .color(0x7289DA)
+        .title("🚧 This bot is being retired")
+        .description(
+            "Parking has moved to a website, and this bot will be shut down soon, without warning. \
+             There is no point adding it to another server.",
+        )
+        .color(0xC0362C)
         .field(
-            "📋 Invite Link",
-            format!("[**Click here to invite the bot!**]({})", invite_url),
-            false
+            "🅿️ Parking",
+            "Go to **https://parkering.smallapp.cc** and sign in with your @student.aau.dk email. \
+             Save your number plate and phone number, then pick which days and times you want.",
+            false,
         )
         .field(
-            "⚡ What can I do?",
-            "• Fun commands like coin flips and jokes\n• Utility features like polls and reminders\n• Message statistics and moderation tools\n• And much more!",
-            false
+            "❓ Why",
+            "The website checks that you are actually a student before it registers anything, \
+             it can notify you when your parking succeeds or fails, and it does not depend on Discord.",
+            false,
         )
-        .field(
-            "🔒 Permissions",
-            "This invite link includes all the permissions I need to work properly:\n• Send Messages\n• Read Message History\n• Embed Links\n• Manage Messages\n• Add Reactions\n• And more essential permissions",
-            false
-        )
-        .field(
-            "💡 Getting Started",
-            "After inviting me, use `-help` or `/help` to see all available commands!",
-            false
-        )
-        .footer(serenity::CreateEmbedFooter::new("Thanks for using our bot! 🦀"))
+        .footer(serenity::CreateEmbedFooter::new("parkering.smallapp.cc"))
         .timestamp(serenity::Timestamp::now());
 
-    ctx.send(poise::CreateReply::default().embed(embed).ephemeral(false))
+    ctx.send(poise::CreateReply::default().embed(embed).ephemeral(true))
         .await?;
 
     Ok(())
